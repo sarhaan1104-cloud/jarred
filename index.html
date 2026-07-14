@@ -187,6 +187,7 @@
 
   .empty svg{width:46px;height:46px;color:#c3b79c;margin:0 auto 14px;display:block;}
   .empty b{color:var(--ink);}
+  .plan-steps + .plan-lab{margin-top:20px;}
 
   /* header context chip */
   .ctx{display:inline-flex;align-items:center;gap:6px;margin-top:11px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);color:#e7eee4;font-size:11.5px;font-weight:600;letter-spacing:.3px;padding:5px 11px;border-radius:20px;}
@@ -781,35 +782,71 @@ function planCard(res,size){
       'Steps below follow <b>method A</b>.</div>';
   }
 
-  // packing / staging steps
-  const steps=[];
+  // ---- detailed, phased steps ----
+  const jarWord=loadN+" "+sizeWord+" jar"+(loadN===1?"":"s");
+
+  // Set up
+  const setup=[
+    "Wash the "+jarWord+" in hot soapy water and rinse well. Keep them hot — sitting in the canner's water or a sink of hot water — so they don't crack when the hot food goes in. Wash the screw bands and set out "+loadN+" new flat lids; just wipe them clean (modern lids don't need boiling).",
+    "Add water to the Nesco per its manual and seat the rack in the bottom so jars never touch the base. Start heating that water now, and keep a kettle of extra water simmering to top up the jars and cover the food."
+  ];
+
+  // Prep the food
+  const prep=[];
   if(res.b.prep.length){
-    steps.push("Brine first: soak "+res.b.prep.map(i=>esc(i.name)).join(", ")+" for the recipe's marinating time, then <b>drain and discard the brine</b> — it never goes in the jar.");
+    prep.push("Brine step: soak "+res.b.prep.map(i=>esc(i.name)).join(", ")+" for the recipe's marinating time, then <b>drain and discard the brine</b> — it flavors the food but never goes in the jar.");
   }
   if(res.verdict==="SOUP"){
-    steps.push("Prep each solid by its own hot-pack directions (pre-cook meat until tender; fully rehydrate any dried beans).");
-    steps.push("Combine the solids, cover with boiling broth, water, or tomatoes, and boil 5 minutes. <b>Do not thicken.</b>");
-    steps.push("Fill each of the "+loadN+" "+sizeWord+" jars <b>halfway with solids</b>, then add liquid to "+hs+'" headspace.');
-    steps.push("Remove air bubbles, wipe rims, seat lids fingertip-tight.");
-    steps.push("Process all "+loadN+" jars at "+psi+" PSI for <b>"+t+" min</b>, then let the canner cool and depressurize naturally.");
+    prep.push("Prep each solid by its own hot-pack method: pre-cook meat until about two-thirds done, blanch or par-cook firm vegetables, and fully rehydrate any dried beans (soak, then boil ~30 min). Everything goes into the jar hot.");
+    prep.push("Combine the solids in a large pot, cover with boiling broth, water, or acidified tomatoes, and boil for 5 minutes. <b>Do not thicken</b> — no flour, cornstarch, or Clearjel; they block heat from reaching the jar's center.");
   }else{
     const f=esc(foods[0].items.map(i=>i.name).join(" / "));
-    steps.push("Hot pack: cook the "+f+" until about two-thirds done, then drain excess fat (fat can climb the jar and break the seal).");
-    steps.push("Pack the hot "+f+" into "+loadN+" "+sizeWord+" jars, leaving "+hs+'" headspace.');
-    steps.push("Cover with boiling broth or water to "+hs+'" headspace. Add ½ tsp salt per pint / 1 tsp per quart if desired (optional — flavor only).');
-    steps.push("Remove air bubbles, wipe rims, seat lids fingertip-tight.");
-    steps.push("Process all "+loadN+" jars at "+psi+" PSI for <b>"+t+" min</b>, then let the canner cool and depressurize naturally.");
+    prep.push("Hot pack: cook the "+f+" until about two-thirds done — hot all the way through but not fully cooked, since it keeps cooking under pressure.");
+    prep.push("Skim or drain excess fat before packing. Fat left on the food creeps up the jar and coats the rim, which stops the lid from sealing.");
   }
+
+  // Pack the jars
+  const pack=[];
+  if(res.verdict==="SOUP"){
+    pack.push("Fill each of the "+jarWord+" <b>halfway with the hot solids</b>, then ladle in boiling liquid to leave "+hs+'" headspace (the gap between food and rim). The half-solids / half-liquid ratio is a safety requirement, not a preference.');
+  }else{
+    const f=esc(foods[0].items.map(i=>i.name).join(" / "));
+    pack.push("Pack the hot "+f+" into the "+jarWord+", then cover with boiling broth or water, leaving "+hs+'" headspace. Add ½ tsp salt per pint / 1 tsp per quart if you like (optional — flavor only, not for safety).');
+  }
+  pack.push("Slide a bubble tool or thin plastic spatula around the inside of each jar to release trapped air, then re-check the headspace and top up the liquid if it dropped.");
+  pack.push("Wipe each rim with a clean, damp cloth (a dab of vinegar cuts any grease). Center a lid on each jar and screw the band on <b>fingertip-tight</b> — snug, but don't crank it; air needs to escape during processing.");
+
+  // Process
+  const proc=[
+    "Load the jars onto the rack with a jar lifter, keeping them from touching each other or the wall, then lock the canner lid.",
+    "<b>Vent for a full 10 minutes:</b> let steam stream steadily from the vent to purge all air from the canner. Skipping or shortening this traps cold air and under-processes the load. Then close the vent / set the weight and let pressure climb to <b>"+psi+" PSI</b>.",
+    "Start your timer only once the canner reaches "+psi+" PSI, and process for <b>"+t+" minutes</b>. Hold the pressure steady the whole time — if it ever drops below "+psi+" PSI, bring it back up and <b>restart the timing from zero</b>.",
+    "When time is up, turn the canner off and let it depressurize <b>naturally</b>. Never run cold water over it or force the valve — the sudden change shatters jars and siphons liquid out of them."
+  ];
+
+  // Cool & store
+  const store=[
+    "Once the gauge reads zero and the lock releases, wait 10 minutes, then open the lid <b>tilted away from your face</b>. Lift the jars straight up (don't tilt them) with the jar lifter and set them on a towel about 1 inch apart, out of drafts.",
+    "Leave the jars <b>undisturbed for 12–24 hours</b>. Don't retighten the bands — you'll hear the lids 'ping' as they seal.",
+    "Check every seal: press the center of each lid — a sealed lid is firm and doesn't flex or pop back. Remove the band and gently lift the jar by the lid edge to confirm it holds. <b>Refrigerate and use within a few days any jar that didn't seal.</b>",
+    "Label each jar with the contents and today's date. Store without the bands in a cool, dark, dry place and use within a year for best quality."
+  ];
 
   // handoff
   let hand="";
   if(res.b.frz.length) hand+='<div class="plan-hand"><span class="tag">Freeze / vacuum-seal:</span> '+res.b.frz.map(i=>esc(i.name)).join(", ")+' — build these as a sauce and freeze; stir in when you reheat.</div>';
   if(res.b.frs.length) hand+='<div class="plan-hand"><span class="tag">Fresh at serving:</span> '+res.b.frs.map(i=>esc(i.name)).join(", ")+' — add at the stove or the table.</div>';
 
+  const phase=(label,arr)=>arr.length?('<div class="plan-lab">'+label+'</div><ol class="plan-steps">'+arr.map(s=>"<li>"+s+"</li>").join("")+'</ol>'):"";
+
   return '<div class="card"><h2>Canning plan</h2>'+
     scaleBox+method+
-    '<div class="plan-lab">Staging — '+loadN+' '+sizeWord+'s, one load</div>'+
-    '<ol class="plan-steps">'+steps.map(s=>"<li>"+s+"</li>").join("")+'</ol>'+
+    '<div class="plan-lab" style="margin-top:6px">Steps — '+jarWord+', one load</div>'+
+    phase('1 · Set up', setup)+
+    phase('2 · Prep the food', prep)+
+    phase('3 · Pack the jars', pack)+
+    phase('4 · Process', proc)+
+    phase('5 · Cool &amp; store', store)+
     hand+'</div>';
 }
 
