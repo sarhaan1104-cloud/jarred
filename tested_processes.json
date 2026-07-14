@@ -1,0 +1,195 @@
+{
+  "_meta": {
+    "title": "Pressure Canning Verifier - Tested Process Whitelist",
+    "version": "2.0",
+    "principle": "The jar is a whitelist, not a calculator. In-jar processing is only valid when the jar contents map onto an already-tested USDA process. Anything not on this list is NOT a validated in-jar candidate and must be routed to freeze/vacuum-seal (Pathway 2) or fresh-at-serving (Pathway 3).",
+    "source": "USDA Complete Guide to Home Canning (2015 revision) and its extension-service adaptations (NCHFP, OSU, UMaine, UNH, Cornell, NDSU). Times cross-verified across sources.",
+    "safety_note": "These times are for reference-building only. Always confirm the exact process against the current USDA Complete Guide or the National Center for Home Food Preservation (nchfp.uga.edu) before canning. This data does not certify any recipe as safe.",
+    "basePressure": {
+      "dialGaugePSI": 11,
+      "weightedGaugePSI": 10,
+      "note": "Base values apply at 0-2000 ft (dial) / 0-1000 ft (weighted). Use altitude adjustment."
+    },
+    "altitudeAdjustment": {
+      "dialGauge": [
+        {"minFt": 0, "maxFt": 2000, "psi": 11},
+        {"minFt": 2001, "maxFt": 4000, "psi": 12},
+        {"minFt": 4001, "maxFt": 6000, "psi": 13},
+        {"minFt": 6001, "maxFt": 8000, "psi": 14},
+        {"minFt": 8001, "maxFt": 10000, "psi": 15}
+      ],
+      "weightedGauge": [
+        {"minFt": 0, "maxFt": 1000, "psi": 10},
+        {"minFt": 1001, "maxFt": 10000, "psi": 15}
+      ]
+    }
+  },
+
+  "pathway1_inJar": {
+    "_note": "Times are minutes at base pressure. 'pt' = pints/half-pints, 'qt' = quarts. null = not recommended for that jar size. Half-pint = pint time; 1.5-pint = quart time.",
+
+    "meat_redMeat": {
+      "displayName": "Red meat - strips, cubes, or chunks (beef, pork, lamb, veal, venison, bear, goat)",
+      "aliases": ["beef", "pork", "lamb", "veal", "venison", "bear", "goat", "chuck", "short rib", "stew meat", "steak", "roast", "shoulder", "loin", "brisket"],
+      "packStyle": ["hot", "raw"],
+      "time": {"pt": 75, "qt": 90},
+      "headspaceInch": 1.0,
+      "prep": "Trim gristle and excess fat. Cut into pieces. Hot pack: cook until rare (about two-thirds done), pack with boiling broth/water/tomato juice. Raw pack: pack raw, add no liquid.",
+      "fatRule": "Remove excess fat before canning; fat can climb the jar and prevent a proper seal."
+    },
+    "meat_ground": {
+      "displayName": "Ground or chopped meat (patties, balls, crumbles, cased sausage)",
+      "aliases": ["ground beef", "ground pork", "ground meat", "chopped meat", "sausage", "meatball", "burger", "mince", "ground chicken", "ground turkey"],
+      "packStyle": ["hot"],
+      "time": {"pt": 75, "qt": 90},
+      "headspaceInch": 1.0,
+      "prep": "Shape into patties/balls or saute loose until lightly browned. Drain excess fat. Pack with boiling broth/water/tomato juice. Coarse grind only - never puree.",
+      "safetyBlock": "Do NOT can pureed/paste-textured meat - no tested process; heat cannot be guaranteed to reach the center."
+    },
+    "poultry_boneless": {
+      "displayName": "Poultry / rabbit - without bones (chicken, turkey, rabbit)",
+      "aliases": ["chicken", "turkey", "rabbit", "chicken thigh", "chicken breast", "boneless chicken", "poultry"],
+      "packStyle": ["hot", "raw"],
+      "time": {"pt": 75, "qt": 90},
+      "headspaceInch": 1.25,
+      "prep": "Can with or without bones. Boneless uses this time. Hot pack: cook until about two-thirds done. Remove excess fat."
+    },
+    "poultry_bonein": {
+      "displayName": "Poultry / rabbit - with bones",
+      "aliases": ["chicken with bones", "bone-in chicken", "chicken pieces bone", "turkey bone-in"],
+      "packStyle": ["hot", "raw"],
+      "time": {"pt": 65, "qt": 75},
+      "headspaceInch": 1.25,
+      "prep": "Bone-in pieces process shorter than boneless."
+    },
+    "stock_broth": {
+      "displayName": "Meat / poultry stock (broth)",
+      "aliases": ["stock", "broth", "bone broth", "chicken stock", "beef stock", "chicken broth", "beef broth"],
+      "isLiquid": true,
+      "packStyle": ["hot"],
+      "time": {"pt": 20, "qt": 25},
+      "headspaceInch": 1.0,
+      "prep": "Simmer bones, strain, cool, skim and discard fat, reheat to boiling, fill jars. Plain stock only - no thickeners."
+    },
+    "seafood_fish": {
+      "displayName": "Fish (salmon, trout, tuna, etc.)",
+      "aliases": ["fish", "salmon", "trout", "tuna", "mackerel", "cod"],
+      "packStyle": ["raw"],
+      "time": {"pt": 100, "qt": null},
+      "headspaceInch": 1.0,
+      "prep": "Pints/half-pints only. Quarts NOT recommended for fish. Follow the specific USDA fish procedure exactly."
+    },
+
+    "veg_asparagus": {"displayName": "Asparagus", "aliases": ["asparagus"], "packStyle": ["hot", "raw"], "time": {"pt": 30, "qt": 40}, "headspaceInch": 1.0},
+    "veg_beans_snap": {"displayName": "Snap / green / wax beans", "aliases": ["green bean", "snap bean", "wax bean", "string bean"], "packStyle": ["hot", "raw"], "time": {"pt": 20, "qt": 25}, "headspaceInch": 1.0},
+    "veg_beans_lima": {"displayName": "Lima / butter beans (fresh shelled)", "aliases": ["lima bean", "butter bean"], "packStyle": ["hot", "raw"], "time": {"pt": 40, "qt": 50}, "headspaceInch": 1.0},
+    "veg_beets": {"displayName": "Beets", "aliases": ["beet", "beets"], "packStyle": ["hot"], "time": {"pt": 30, "qt": 35}, "headspaceInch": 1.0},
+    "veg_carrots": {"displayName": "Carrots (sliced or diced)", "aliases": ["carrot", "carrots"], "packStyle": ["hot", "raw"], "time": {"pt": 25, "qt": 30}, "headspaceInch": 1.0},
+    "veg_corn_whole": {"displayName": "Corn, whole kernel", "aliases": ["corn", "sweet corn", "whole kernel corn"], "packStyle": ["hot", "raw"], "time": {"pt": 55, "qt": 85}, "headspaceInch": 1.0},
+    "veg_corn_cream": {"displayName": "Corn, cream style", "aliases": ["cream corn", "cream style corn", "creamed corn"], "packStyle": ["hot"], "time": {"pt": 85, "qt": null}, "headspaceInch": 1.0, "prep": "Pints only. Quarts NOT recommended."},
+    "veg_greens": {"displayName": "Spinach and other greens", "aliases": ["spinach", "kale", "collard", "greens", "chard", "beet greens", "mustard greens"], "packStyle": ["hot"], "time": {"pt": 70, "qt": 90}, "headspaceInch": 1.0},
+    "veg_mixed": {"displayName": "Mixed vegetables (tested combo, no greens/squash/sweet-potato)", "aliases": ["mixed vegetables", "mixed veg"], "packStyle": ["hot"], "time": {"pt": 75, "qt": 90}, "headspaceInch": 1.0, "prep": "USDA tested mix: carrots, whole-kernel corn, cut green beans, lima beans, crushed tomatoes, cubed zucchini in roughly equal parts. Substitutions change the process."},
+    "veg_mushrooms": {"displayName": "Mushrooms, domestic (whole or sliced)", "aliases": ["mushroom", "mushrooms", "button mushroom", "cremini", "white mushroom"], "packStyle": ["hot"], "time": {"pt": 45, "qt": null}, "headspaceInch": 1.0, "prep": "Half-pints/pints only. WHOLE or SLICED only - this is the tested form. Domestic only, NEVER wild. Powdered/dehydrated mushroom is NOT a tested in-jar item (route to Pathway 2)."},
+    "veg_okra": {"displayName": "Okra", "aliases": ["okra"], "packStyle": ["hot"], "time": {"pt": 25, "qt": 40}, "headspaceInch": 1.0},
+    "veg_peas_green": {"displayName": "Peas, green / English (shelled)", "aliases": ["green pea", "english pea", "shelled pea", "peas"], "packStyle": ["hot", "raw"], "time": {"pt": 40, "qt": 40}, "headspaceInch": 1.0},
+    "veg_peppers": {"displayName": "Peppers (hot or sweet)", "aliases": ["pepper", "bell pepper", "hot pepper", "chile", "jalapeno"], "packStyle": ["hot"], "time": {"pt": 35, "qt": null}, "headspaceInch": 1.0, "prep": "Half-pints/pints. Follow the specific USDA pepper procedure."},
+    "veg_potatoes": {"displayName": "Potatoes, white (cubed or whole)", "aliases": ["potato", "potatoes", "white potato"], "packStyle": ["hot"], "time": {"pt": 35, "qt": 40}, "headspaceInch": 1.0, "prep": "Cube or use small whole. NEVER mashed or pureed."},
+    "veg_pumpkin_squash_cubed": {"displayName": "Pumpkin / winter squash, cubed", "aliases": ["pumpkin", "winter squash", "butternut", "acorn squash"], "packStyle": ["hot"], "time": {"pt": 55, "qt": 90}, "headspaceInch": 1.0, "prep": "1-inch CUBES only. NEVER mashed or pureed."},
+    "veg_sweet_potato": {"displayName": "Sweet potatoes (pieces)", "aliases": ["sweet potato", "yam"], "packStyle": ["hot"], "time": {"pt": 65, "qt": 90}, "headspaceInch": 1.0, "prep": "Pieces only. NEVER mashed or pureed."},
+    "veg_beans_dried": {"displayName": "Dried beans / peas (rehydrated), plain", "aliases": ["dried bean", "pinto bean", "kidney bean", "black bean", "navy bean", "chickpea", "dried pea", "legume"], "packStyle": ["hot"], "time": {"pt": 75, "qt": 90}, "headspaceInch": 1.0, "prep": "Must be fully soaked AND boiled 30 min before packing. If used in soup instead, rehydrate but do not pre-boil 30 min."},
+
+    "tomato_crushed": {"displayName": "Tomatoes, crushed (acidified)", "aliases": ["crushed tomato", "tomato"], "packStyle": ["hot"], "time": {"pt": 15, "qt": 15}, "headspaceInch": 0.5, "acidRule": "MUST add bottled lemon juice (2 tbsp/qt, 1 tbsp/pt) or citric acid (1/2 tsp/qt, 1/4 tsp/pt). This time is the pressure-canner option."},
+    "tomato_whole_water": {"displayName": "Tomatoes, whole/halved in water (acidified)", "aliases": ["whole tomato", "halved tomato"], "packStyle": ["hot", "raw"], "time": {"pt": 10, "qt": 10}, "headspaceInch": 0.5, "acidRule": "Must be acidified (see crushed)."}
+  },
+
+  "soupGate": {
+    "displayName": "USDA 'your choice' soup",
+    "when": "Two or more tested Pathway-1 foods combined with liquid in one jar.",
+    "time": {"pt": 60, "qt": 75},
+    "timeSeafood": {"pt": 100, "qt": 100},
+    "headspaceInch": 1.0,
+    "rules": [
+      "Every solid ingredient must itself have a tested canning recommendation (i.e. appear in pathway1_inJar). No cabbage, no broccoli, no cured/brined meats.",
+      "Fill jar HALFWAY with solids, then cover with liquid (broth/water/tomatoes), 1-inch headspace. The 1:1 solid-to-liquid ratio is a safety requirement, not a preference.",
+      "Boil the combined mixture 5 minutes before packing.",
+      "Meat must be pre-cooked before canning.",
+      "Dried beans/peas must be fully rehydrated first.",
+      "DO NOT thicken (no flour, cornstarch, Clearjel, or pureeing for body).",
+      "NO dairy, NO pasta/noodles/rice.",
+      "If seafood is present, the whole jar processes at the seafood time (100 min)."
+    ]
+  },
+
+  "notInJar": {
+    "_note": "These never go in the jar. 'route' tells the app which pathway to send them to.",
+
+    "hardBlock_thickeners": {
+      "route": "pathway2_thickenAtServing",
+      "reason": "Thickeners slow heat penetration to the jar core, causing under-processing (botulism risk).",
+      "items": ["flour", "cornstarch", "corn starch", "arrowroot", "roux", "tapioca", "starch", "instant potato", "gravy mix", "cornflour"],
+      "clearjelException": "Modified starch (Clearjel) is safe ONLY inside a specific tested recipe that calls for it by name and amount. It is NOT permitted in the free-choice soup pathway."
+    },
+    "hardBlock_dairy": {
+      "route": "pathway3_freshAtServing",
+      "reason": "Low-acid, not safe to can; curdles/separates and can cause seal failure and spoilage.",
+      "items": ["milk", "cream", "heavy cream", "half and half", "butter", "cheese", "parmesan", "cheddar", "mozzarella", "sour cream", "yogurt", "buttermilk", "cream cheese", "evaporated milk", "condensed milk"]
+    },
+    "hardBlock_starchGrains": {
+      "route": "pathway3_freshAtServing",
+      "reason": "Swell and absorb liquid, turn to paste, and heat unevenly; no tested process.",
+      "items": ["pasta", "noodle", "noodles", "macaroni", "spaghetti", "rice", "barley", "quinoa", "orzo", "dumpling", "couscous", "egg noodle"]
+    },
+    "hardBlock_eggs": {
+      "route": "pathway3_freshAtServing",
+      "reason": "No research-tested process for home-canned eggs.",
+      "items": ["egg", "eggs", "hard boiled egg"]
+    },
+    "hardBlock_oilsFats": {
+      "route": "pathway3_freshAtServing",
+      "reason": "Excess oil/fat insulates food (under-processing) and coats the seal (seal failure).",
+      "allowance": "Up to ~1 tbsp added fat/oil for browning is acceptable; drain the rest. Larger quantities and finishing oils go outside the jar.",
+      "items": ["olive oil", "vegetable oil", "canola oil", "oil", "lard", "duck fat", "schmaltz", "bacon grease", "ghee"]
+    },
+    "hardBlock_curedMeats": {
+      "route": "pathway3_freshAtServing_or_testedRecipeOnly",
+      "reason": "NCHFP soup guidance excludes cured/brined meats; only permitted inside a specific tested recipe.",
+      "items": ["bacon", "ham", "cured ham", "prosciutto", "pancetta", "cured sausage", "salami", "pepperoni", "corned beef"]
+    },
+    "hardBlock_untestedVeg": {
+      "route": "pathway3_freshAtServing_or_freeze",
+      "reason": "No USDA-tested process; texture also degrades badly under pressure.",
+      "items": ["cabbage", "broccoli", "cauliflower", "celery", "brussels sprout", "brussels sprouts", "summer squash", "zucchini", "eggplant", "kohlrabi", "lettuce", "bok choy", "artichoke"]
+    },
+    "hardBlock_puree": {
+      "route": "pathway2_or_blocked",
+      "reason": "Pureed/mashed low-acid foods have NO tested process - heat cannot be guaranteed to reach the center.",
+      "items": ["puree", "pureed", "mashed", "refried", "pumpkin puree", "mashed potato", "mashed squash", "meat paste"]
+    },
+    "hardBlock_concentrates": {
+      "route": "pathway2_freezeVacuumSeal",
+      "reason": "Concentrated/dehydrated low-acid flavorings have no tested in-jar process and add uneven density. Use them to build a Pathway-2 sauce.",
+      "items": ["mushroom powder", "dehydrated mushroom", "dried mushroom", "porcini powder", "tomato powder", "vegetable powder", "bouillon", "stock concentrate", "demi-glace", "demiglace"]
+    },
+    "hardBlock_alcohol": {
+      "route": "pathway2_freezeVacuumSeal",
+      "reason": "Wine/spirits are not an approved jar-covering liquid. Simmer into a Pathway-2 sauce (which also mellows the raw alcohol).",
+      "items": ["red wine", "white wine", "wine", "beer", "sherry", "vermouth", "brandy", "bourbon", "rum", "marsala"]
+    },
+    "hardBlock_condiments": {
+      "route": "pathway3_freshAtServing",
+      "reason": "Condiments/emulsions - add fresh at serving, not in the jar.",
+      "items": ["mayonnaise", "mayo", "dijon", "yellow mustard", "prepared mustard", "ketchup", "relish", "hot sauce", "bbq sauce", "barbecue sauce", "pickle", "pickles"]
+    },
+    "hardBlock_bread": {
+      "route": "pathway3_freshAtServing",
+      "reason": "Breads / assembly items - serve fresh.",
+      "items": ["bun", "buns", "bread", "roll", "rolls", "tortilla", "crouton", "breadcrumb", "panko", "biscuit"]
+    }
+  },
+
+  "seasonings_noCount": {
+    "_note": "Flavor only, no safety impact, do not count toward jar-fill percentage. Dry spices/dried herbs may be added freely; salt is optional (flavor only, not a preservative).",
+    "items": ["salt", "pepper", "black pepper", "white pepper", "sugar", "cumin", "paprika", "chili powder", "garlic powder", "onion powder", "oregano", "basil", "thyme", "bay leaf", "herbes de provence", "italian seasoning", "red pepper flakes", "cinnamon", "dried herb", "dried spice"],
+    "aromaticsNote": "Fresh onion, garlic, and peppers are permitted as minor components inside a tested soup or tested recipe, but have limited/no standalone in-jar process on their own (peppers excepted, above)."
+  }
+}
