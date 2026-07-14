@@ -892,11 +892,6 @@ function planCard(res,size){
     "Label each jar with the contents and today's date. Store without the bands in a cool, dark, dry place and use within a year for best quality."
   ];
 
-  // handoff
-  let hand="";
-  if(res.b.frz.length) hand+='<div class="plan-hand"><span class="tag">Freeze / vacuum-seal:</span> '+res.b.frz.map(i=>esc(i.name)).join(", ")+' — build these as a sauce and freeze; stir in when you reheat.</div>';
-  if(res.b.frs.length) hand+='<div class="plan-hand"><span class="tag">Fresh at serving:</span> '+res.b.frs.map(i=>esc(i.name)).join(", ")+' — add at the stove or the table.</div>';
-
   const phase=(label,arr)=>arr.length?('<div class="plan-lab">'+label+'</div><ol class="plan-steps">'+arr.map(s=>"<li>"+s+"</li>").join("")+'</ol>'):"";
 
   return '<div class="card"><h2>Canning plan</h2>'+
@@ -907,13 +902,14 @@ function planCard(res,size){
     phase('3 · Pack the jars', pack)+
     phase('4 · Process', proc)+
     phase('5 · Cool &amp; store', store)+
-    hand+'</div>';
+    '</div>';
 }
 
-/* ---- convert the recipe's own instructions into canning-prep steps ---- */
-function recipeStepsCard(res){
+/* ---- sort the recipe's own instructions into before-canning vs serving ---- */
+function sortSteps(res){
+  const jarSteps=[],outSteps=[];
   const raw=(state.recipeSteps||[]).filter(s=>s&&s.length>3);
-  if(!raw.length) return "";
+  if(!raw.length) return {jarSteps,outSteps};
   // build an ingredient -> pathway index from the staged result
   const idx=[];
   ["inj","frz","frs","prep","rev","seas"].forEach(pw=>res.b[pw].forEach(it=>{
@@ -924,7 +920,6 @@ function recipeStepsCard(res){
   const SERVE=/\b(assemble|sandwich|serve|serving|served|toast|toasted|spread|garnish|drizzle|layer|plate|build|dredge|batter|coat|coated|bread(ed)?|crisp|fry|frying|fried|deep[- ]?fr)/;
   const BRINE=/\b(brine|brined|brining|marinate|marinated|marinade|soak|soaked)\b/;
   const COOK=/\b(cook|cooked|brown|browned|sear|seared|simmer|boil|boiled|roast|roasted|braise|braised|saut|poach|steam|stew|bake|baked)\b/;
-  const jarSteps=[],outSteps=[];
   let brineShown=false,cookShown=false;
   raw.forEach(txt=>{
     const low=" "+txt.toLowerCase()+" ";
@@ -943,15 +938,53 @@ function recipeStepsCard(res){
     if(tag==="jar"||tag==="prep") jarSteps.push({txt,note});
     else outSteps.push({txt,tag});
   });
+  return {jarSteps,outSteps};
+}
+/* ---- recipe's own prep steps to do before canning ---- */
+function recipeStepsCard(res){
+  const {jarSteps}=sortSteps(res);
+  if(!jarSteps.length) return "";
   const li=o=>"<li>"+esc(o.txt)+(o.note?" <b style='color:var(--rust)'>→ "+esc(o.note)+"</b>":"")+"</li>";
-  let h='<div class="card"><h2>Your recipe → canning prep</h2>'+
-    '<p class="hint">Your recipe’s own method, re-sorted for canning. Do the jar-prep steps before you process; the rest waits until you open a jar to serve.</p>';
-  if(jarSteps.length) h+='<div class="plan-lab" style="margin-top:2px">Do before canning</div><ol class="plan-steps">'+jarSteps.map(li).join("")+'</ol>';
-  if(outSteps.length){
-    h+='<div class="plan-lab" style="margin-top:16px">Leave for serving / freeze</div><ol class="plan-steps">'+
-      outSteps.map(o=>{const p=o.tag==="frz"?'<span class="pill frz">FREEZE</span>':'<span class="pill frs">FRESH</span>';return "<li>"+esc(o.txt)+" "+p+"</li>";}).join("")+'</ol>';
-  }
-  return h+'</div>';
+  return '<div class="card"><h2>Prep from your recipe</h2>'+
+    '<p class="hint">Your recipe’s own method, filtered to just the steps you do <b>before</b> canning. Frying, assembly and sauces move to the rebuild below.</p>'+
+    '<ol class="plan-steps">'+jarSteps.map(li).join("")+'</ol></div>';
+}
+/* ---- what physically goes in each container + how to rebuild the meal ---- */
+function assemblyCard(res,size){
+  if(!res.jp) return "";
+  const sizeWord=size==="pt"?"pint":"quart";
+  const loadN=LOADN[size];
+  const solids=res.b.inj.filter(i=>!(i.proc&&i.proc.liquid));
+  const liquids=res.b.inj.filter(i=>i.proc&&i.proc.liquid);
+  if(!solids.length) return "";
+  const solidNames=solids.map(i=>esc(i.name)).join(" + ");
+  const liqNames=liquids.length?liquids.map(i=>esc(i.name)).join(" / "):"boiling broth or water";
+  const jarSVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2h10"/><path d="M8 2v3l-1 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V7l-1-2V2"/><path d="M7 13h10"/></svg>';
+  const frzSVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M4 12h16M6 6l12 12M18 6L6 18"/></svg>';
+  const frsSVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M11 21A8 8 0 0 1 3 13C3 6 11 3 11 3s8 3 8 10a8 8 0 0 1-8 8z"/><path d="M11 21v-9"/></svg>';
+  const mapRow=(cls,ic,title,desc)=>
+    '<div style="display:flex;gap:12px;align-items:flex-start;padding:13px 0;border-bottom:1px solid var(--line)">'+
+      '<span class="pill '+cls+'" style="width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:0 0 auto;padding:0"><span style="width:19px;height:19px;display:block">'+ic+'</span></span>'+
+      '<div style="flex:1"><div style="font-weight:700;font-size:14px;margin-bottom:2px">'+title+'</div>'+
+      '<div style="font-size:13px;color:#5c574c;line-height:1.5">'+desc+'</div></div></div>';
+  let map=mapRow('inj',jarSVG,loadN+' × '+sizeWord+' jars — all identical',
+    (res.verdict==="SOUP"
+      ? 'Half-fill each jar with '+solidNames+', then cover with '+liqNames+'. Every jar is the same blend.'
+      : solidNames+' packed and covered with '+liqNames+'. Every jar is the same.'));
+  if(res.b.frz.length) map+=mapRow('frz',frzSVG,'Freezer',
+    res.b.frz.map(i=>esc(i.name)).join(", ")+' — portion into freezer bags or vacuum-seal; label &amp; date.');
+  if(res.b.frs.length) map+=mapRow('frs',frsSVG,'Fresh — fridge / pantry',
+    res.b.frs.map(i=>esc(i.name)).join(", ")+' — buy or make these the day you serve.');
+  // rebuild
+  const serveSteps=sortSteps(res).outSteps.map(o=>o.txt);
+  const rebuild=[];
+  rebuild.push('Open <b>one '+sizeWord+' jar</b> per meal, tip it into a pan, and <b>boil the contents 10 minutes</b> before tasting — the standard safety step for home-canned low-acid food.');
+  if(res.b.frz.length) rebuild.push('Bring the freezer items out to thaw — '+res.b.frz.map(i=>esc(i.name)).join(", ")+' — and reheat any sauces or gravies to stir in.');
+  if(serveSteps.length) serveSteps.forEach(s=>rebuild.push(esc(s)));
+  else if(res.b.frs.length) rebuild.push('Finish with the fresh parts — '+res.b.frs.map(i=>esc(i.name)).join(", ")+' — and plate up.');
+  return '<div class="card"><h2>Pack &amp; store — what goes where</h2>'+map+
+    '<div class="plan-lab" style="margin-top:16px">Rebuild the meal</div>'+
+    '<ol class="plan-steps">'+rebuild.map(s=>'<li>'+s+'</li>').join("")+'</ol></div>';
 }
 
 function resultsFor(size){
@@ -1002,7 +1035,7 @@ function prepareFor(size){
   const head='<div class="card" style="padding-bottom:15px"><h2 style="margin-bottom:4px">'+esc(document.getElementById("rname").value)+'</h2>'+
     '<div style="font-size:12px;color:var(--muted)">'+(size==="pt"?"5-pint load":"4-quart load")+' · preparation &amp; process</div></div>';
   const tail='<div class="card"><p class="disc" style="margin:0;border:none;padding:0">Triage aid only — confirm the exact time, pressure, and jar size against the USDA Complete Guide or nchfp.uga.edu before canning.</p></div>';
-  return head+procCard(res.jp,res.verdict,size)+recipeStepsCard(res)+planCard(res,size)+tail;
+  return head+procCard(res.jp,res.verdict,size)+recipeStepsCard(res)+planCard(res,size)+assemblyCard(res,size)+tail;
 }
 function renderPrepare(){
   const t=document.getElementById("tab-prepare");
