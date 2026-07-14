@@ -476,6 +476,7 @@ function parseRecipeText(text){
 const router=new StagingRouter(DATA);
 const state={
   loadSize:"pt",
+  recipeSteps:[],
   ings:[
     {name:"boneless chicken thighs",amount:2,unit:"lb"},
     {name:"kimchi juice",amount:0.5,unit:"cup"},
@@ -574,6 +575,7 @@ async function doImportURL(){
   const url=(urlEl?urlEl.value:"").trim();
   if(!url){msg.className="impmsg info";msg.textContent="Paste a recipe URL above first.";return;}
   msg.className="impmsg info";msg.textContent="Fetching recipe...";
+  state.recipeSteps=[];
   const proxies=[
     function(u){return "https://api.allorigins.win/get?url="+encodeURIComponent(u);},
     function(u){return "https://corsproxy.io/?"+encodeURIComponent(u);}
@@ -605,11 +607,13 @@ async function doImportURL(){
   var r=extractJsonLdRecipe(html);
   if(r){
     if(r.name)document.getElementById("rname").value=r.name;
+    state.recipeSteps=normInstructions(r.recipeInstructions);
     parseAndLoad(r.recipeIngredient.join("\n"),msg);return;
   }
-  // For strategies 2-4, try to pull the page/recipe name
+  // For strategies 2-4, try to pull the page/recipe name + instructions
   var pn=extractPageName(html);
   if(pn)document.getElementById("rname").value=pn;
+  state.recipeSteps=extractInstructionSection(html);
   // Strategy 2: microdata + common recipe plugin selectors
   var domLines=extractHtmlIngredients(html);
   if(domLines.length){parseAndLoad(domLines.join("\n"),msg);return;}
@@ -695,6 +699,49 @@ function extractPageName(html){
     return title.replace(/\s*[\|\-–—].*$/,"").trim();
   }catch(e){}
   return "";
+}
+/* normalise JSON-LD recipeInstructions (string | HowToStep | HowToSection | arrays) */
+function normInstructions(v){
+  var out=[];
+  var walk=function(x){
+    if(!x)return;
+    if(typeof x==="string"){var s=x.replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim();if(s)out.push(s);return;}
+    if(Array.isArray(x)){x.forEach(walk);return;}
+    if(typeof x==="object"){
+      if(x.itemListElement){walk(x.itemListElement);return;}
+      if(x.text){walk(x.text);return;}
+      if(x.name){walk(x.name);return;}
+    }
+  };
+  walk(v);
+  return out.filter(function(s){return s.length>3;}).slice(0,40);
+}
+/* pull an instructions/directions/method section out of raw HTML */
+function extractInstructionSection(html){
+  try{
+    var doc=(new DOMParser()).parseFromString(html,"text/html");
+    var sels=['.wprm-recipe-instruction-text','.tasty-recipe-instructions li','.recipe-instructions li',
+      '.recipe-directions__list--item','.instructions li','[itemprop="recipeInstructions"] li',
+      '[class*="instruction"] li','[class*="direction"] li'];
+    for(var s=0;s<sels.length;s++){
+      var els=doc.querySelectorAll(sels[s]);
+      if(els.length>1)return Array.from(els).map(function(e){return e.textContent.replace(/\s+/g," ").trim();}).filter(function(t){return t.length>3;});
+    }
+    var heads=doc.querySelectorAll("h1,h2,h3,h4,h5,h6");
+    for(var i=0;i<heads.length;i++){
+      if(/instruction|direction|method|preparation/i.test(heads[i].textContent)){
+        var lines=[],el=heads[i].nextElementSibling;
+        while(el&&!/^H[1-6]$/.test(el.tagName)){
+          var lis=el.querySelectorAll("li");
+          if(lis.length){lis.forEach(function(li){var t=li.textContent.replace(/\s+/g," ").trim();if(t.length>3)lines.push(t);});}
+          else if(el.tagName==="P"){var t=el.textContent.replace(/\s+/g," ").trim();if(t.length>3)lines.push(t);}
+          el=el.nextElementSibling;
+        }
+        if(lines.length)return lines.slice(0,40);
+      }
+    }
+  }catch(e){}
+  return [];
 }
 async function doImportClipboard(){
   const msg=document.getElementById("impmsg");
@@ -863,6 +910,50 @@ function planCard(res,size){
     hand+'</div>';
 }
 
+/* ---- convert the recipe's own instructions into canning-prep steps ---- */
+function recipeStepsCard(res){
+  const raw=(state.recipeSteps||[]).filter(s=>s&&s.length>3);
+  if(!raw.length) return "";
+  // build an ingredient -> pathway index from the staged result
+  const idx=[];
+  ["inj","frz","frs","prep","rev","seas"].forEach(pw=>res.b[pw].forEach(it=>{
+    const nm=String(it.name).toLowerCase();
+    idx.push({pw:pw,name:nm,toks:nm.split(/[^a-z]+/).filter(w=>w.length>=4)});
+  }));
+  // frying/breading/assembly is always a serving step, even if it says "cooked"
+  const SERVE=/\b(assemble|sandwich|serve|serving|served|toast|toasted|spread|garnish|drizzle|layer|plate|build|dredge|batter|coat|coated|bread(ed)?|crisp|fry|frying|fried|deep[- ]?fr)/;
+  const BRINE=/\b(brine|brined|brining|marinate|marinated|marinade|soak|soaked)\b/;
+  const COOK=/\b(cook|cooked|brown|browned|sear|seared|simmer|boil|boiled|roast|roasted|braise|braised|saut|poach|steam|stew|bake|baked)\b/;
+  const jarSteps=[],outSteps=[];
+  let brineShown=false,cookShown=false;
+  raw.forEach(txt=>{
+    const low=" "+txt.toLowerCase()+" ";
+    let hasInj=false,hasFrz=false,hasFrs=false,hasPrep=false;
+    idx.forEach(g=>{
+      const hit=low.indexOf(g.name)>=0||g.toks.some(t=>low.indexOf(t)>=0);
+      if(hit){if(g.pw==="inj")hasInj=true;else if(g.pw==="frz")hasFrz=true;else if(g.pw==="frs")hasFrs=true;else if(g.pw==="prep")hasPrep=true;}
+    });
+    let tag,note="";
+    if(SERVE.test(low)){tag="frs";}
+    else if(hasPrep||BRINE.test(low)){tag="prep";if(!brineShown){note="Then drain and discard the brine — it flavors the food but never goes in the jar.";brineShown=true;}}
+    else if(hasFrz&&!hasInj){tag="frz";}
+    else if(hasFrs&&!hasInj){tag="frs";}
+    else if(hasInj||COOK.test(low)){tag="jar";if(COOK.test(low)&&!cookShown){note="Cook only until about two-thirds done — it finishes under pressure in the jar.";cookShown=true;}}
+    else {tag="jar";}
+    if(tag==="jar"||tag==="prep") jarSteps.push({txt,note});
+    else outSteps.push({txt,tag});
+  });
+  const li=o=>"<li>"+esc(o.txt)+(o.note?" <b style='color:var(--rust)'>→ "+esc(o.note)+"</b>":"")+"</li>";
+  let h='<div class="card"><h2>Your recipe → canning prep</h2>'+
+    '<p class="hint">Your recipe’s own method, re-sorted for canning. Do the jar-prep steps before you process; the rest waits until you open a jar to serve.</p>';
+  if(jarSteps.length) h+='<div class="plan-lab" style="margin-top:2px">Do before canning</div><ol class="plan-steps">'+jarSteps.map(li).join("")+'</ol>';
+  if(outSteps.length){
+    h+='<div class="plan-lab" style="margin-top:16px">Leave for serving / freeze</div><ol class="plan-steps">'+
+      outSteps.map(o=>{const p=o.tag==="frz"?'<span class="pill frz">FREEZE</span>':'<span class="pill frs">FRESH</span>';return "<li>"+esc(o.txt)+" "+p+"</li>";}).join("")+'</ol>';
+  }
+  return h+'</div>';
+}
+
 function resultsFor(size){
   const res=router.stage(state.ings,{jarSize:size});
   const revItems=res.b.rev;
@@ -911,7 +1002,7 @@ function prepareFor(size){
   const head='<div class="card" style="padding-bottom:15px"><h2 style="margin-bottom:4px">'+esc(document.getElementById("rname").value)+'</h2>'+
     '<div style="font-size:12px;color:var(--muted)">'+(size==="pt"?"5-pint load":"4-quart load")+' · preparation &amp; process</div></div>';
   const tail='<div class="card"><p class="disc" style="margin:0;border:none;padding:0">Triage aid only — confirm the exact time, pressure, and jar size against the USDA Complete Guide or nchfp.uga.edu before canning.</p></div>';
-  return head+procCard(res.jp,res.verdict,size)+planCard(res,size)+tail;
+  return head+procCard(res.jp,res.verdict,size)+recipeStepsCard(res)+planCard(res,size)+tail;
 }
 function renderPrepare(){
   const t=document.getElementById("tab-prepare");
@@ -974,7 +1065,7 @@ document.getElementById("clearbtn").addEventListener("click",()=>{
   if(impmsg){impmsg.className="";impmsg.textContent="";}
   const fb=document.getElementById("fallbackbox");
   if(fb)fb.innerHTML="";
-  state.ings=[];state.analyzed=false;
+  state.ings=[];state.recipeSteps=[];state.analyzed=false;
   renderIngs();renderResults();renderPrepare();
   switchTab("analyze");
   document.querySelector("main").scrollTop=0;
