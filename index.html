@@ -2,8 +2,20 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>CAN U CAN IT! — Pressure Canning Verifier</title>
+<meta name="theme-color" content="#33443a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Can U Can It">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,400..600,0..100,0..1&display=swap" rel="stylesheet">
 <style>
   :root{
     --green:#33443a; --green-deep:#2b3a30;
@@ -15,7 +27,7 @@
     --amber-bg:#f2e6d2; --amber-ink:#8a6a3c;
     --olive-bg:#e2e3d0; --olive-ink:#5f6a3f;
     --red-bg:#f6e0dc; --red-ink:#b0463a;
-    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    --serif:"Fraunces","Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
     --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -23,6 +35,7 @@
   body{
     background:#1b221d; font-family:var(--sans); color:var(--ink);
     display:flex; justify-content:center; align-items:stretch; min-height:100vh;
+    font-optical-sizing:auto; font-variation-settings:"SOFT" 60,"WONK" 0;
   }
   .shell{
     width:100%; max-width:434px; background:var(--cream);
@@ -36,7 +49,7 @@
   /* header */
   header{
     background:linear-gradient(180deg,var(--green) 0%,var(--green-deep) 100%);
-    color:#fff; padding:20px 22px 18px; flex:0 0 auto;
+    color:#fff; padding:calc(20px + env(safe-area-inset-top)) 22px 18px; flex:0 0 auto;
   }
   .brandrow{display:flex; align-items:center; gap:12px;}
   .avatar{width:34px;height:34px;border-radius:50%;background:#c98a4e;display:flex;align-items:center;justify-content:center;flex:0 0 auto;}
@@ -147,7 +160,7 @@
   /* nav */
   nav{
     flex:0 0 auto; background:var(--card); border-top:1px solid var(--line);
-    display:flex; padding:8px 6px 12px;
+    display:flex; padding:8px 6px calc(12px + env(safe-area-inset-bottom));
   }
   nav button{flex:1; background:none; border:none; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:4px; color:var(--muted); font-family:var(--sans); font-size:11px; font-weight:600;}
   nav button svg{width:22px;height:22px;}
