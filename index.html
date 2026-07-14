@@ -160,6 +160,41 @@
   .impmsg{font-size:13px; line-height:1.5; margin-top:10px; padding:10px 12px; border-radius:10px;}
   .impmsg.ok{background:var(--sage-bg); color:var(--sage-ink);}
   .impmsg.info{background:#eef1e9; color:#5c6b52;}
+
+  /* ---- visual polish ---- */
+  .btn{transition:transform .12s ease, filter .15s ease, box-shadow .18s ease;}
+  .btn:hover{filter:brightness(1.06);}
+  .btn:active{transform:scale(.97);}
+  .btn.block.rust{box-shadow:0 6px 18px -8px rgba(178,106,55,.7);}
+  .addlink{transition:opacity .15s ease; border-radius:8px;}
+  .addlink:active{opacity:.55;}
+  .seg button{transition:background .22s ease,color .22s ease,border-color .22s ease,transform .12s ease;}
+  .seg button:active{transform:scale(.97);}
+  .seg button.on{box-shadow:0 4px 14px -6px rgba(51,68,58,.7);}
+  .ing-row .x{transition:transform .12s ease,filter .15s ease;}
+  .ing-row .x:active{transform:scale(.86);}
+  input[type=text],input[type=number],select,textarea.paste{transition:border-color .15s ease, box-shadow .15s ease;}
+  input[type=text]:focus,input[type=number]:focus,select:focus,textarea.paste:focus{box-shadow:0 0 0 3px rgba(178,106,55,.14);}
+  nav button{transition:color .2s ease,transform .12s ease;}
+  nav button:active{transform:scale(.92);}
+  nav button.on svg{transform:translateY(-1px);transition:transform .2s ease;}
+
+  .tab.on{animation:tabIn .34s cubic-bezier(.2,.7,.3,1);}
+  @keyframes tabIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+
+  .donut .ring{animation:donutdraw 1.05s cubic-bezier(.3,.85,.3,1);}
+  @keyframes donutdraw{from{stroke-dashoffset:327;}}
+
+  .empty svg{width:46px;height:46px;color:#c3b79c;margin:0 auto 14px;display:block;}
+  .empty b{color:var(--ink);}
+
+  /* header context chip */
+  .ctx{display:inline-flex;align-items:center;gap:6px;margin-top:11px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);color:#e7eee4;font-size:11.5px;font-weight:600;letter-spacing:.3px;padding:5px 11px;border-radius:20px;}
+  .ctx svg{width:13px;height:13px;}
+
+  @media (prefers-reduced-motion: reduce){
+    *,*::before,*::after{animation-duration:.001s!important;animation-iteration-count:1!important;transition-duration:.001s!important;}
+  }
 </style>
 </head>
 <body>
@@ -172,6 +207,7 @@
       <h1>CAN U CAN IT!</h1>
     </div>
     <p class="sub">Pressure canning verifier · Nesco 9.5qt</p>
+    <div class="ctx" id="ctxline"></div>
   </header>
 
   <main>
@@ -459,6 +495,7 @@ function renderIngs(){
     const i=+e.target.dataset.i,f=e.target.dataset.f;state.ings[i][f]=e.target.value;}));
   box.querySelectorAll("[data-del]").forEach(b=>b.addEventListener("click",e=>{
     state.ings.splice(+e.target.dataset.del,1);renderIngs();}));
+  updateCtx();
 }
 const IMPORT_BODY={
   photo:'<div class="dropzone" style="padding:20px;text-align:center">'+
@@ -684,7 +721,7 @@ function donutSVG(pct){
   const r=52,c=2*Math.PI*r,off=c*(1-pct/100);
   return '<svg class="donut" viewBox="0 0 118 118">'+
     '<circle cx="59" cy="59" r="'+r+'" fill="none" stroke="#eadfce" stroke-width="12"/>'+
-    '<circle cx="59" cy="59" r="'+r+'" fill="none" stroke="var(--rust)" stroke-width="12" stroke-linecap="round" stroke-dasharray="'+c+'" stroke-dashoffset="'+off+'" transform="rotate(-90 59 59)"/>'+
+    '<circle class="ring" cx="59" cy="59" r="'+r+'" fill="none" stroke="var(--rust)" stroke-width="12" stroke-linecap="round" stroke-dasharray="'+c+'" stroke-dashoffset="'+off+'" transform="rotate(-90 59 59)"/>'+
     '<text class="lbl" x="59" y="56" text-anchor="middle" font-size="26" font-weight="700" fill="var(--ink)">'+pct+'%</text>'+
     '<text x="59" y="74" text-anchor="middle" font-size="11" fill="var(--muted)" letter-spacing="1">IN-JAR</text></svg>';
 }
@@ -813,7 +850,7 @@ function resultsFor(size){
 }
 function renderResults(){
   const t=document.getElementById("tab-results");
-  if(!state.analyzed){t.innerHTML='<div class="card"><div class="empty">Add ingredients on the Analyze tab, then tap <b>Analyze recipe</b> to see the pathway breakdown here.</div></div>';return;}
+  if(!state.analyzed){t.innerHTML='<div class="card"><div class="empty">'+iconEmpty()+'Add ingredients on the Analyze tab, then tap <b>Analyze recipe</b> to see the pathway breakdown here.</div></div>';return;}
   if(state.loadSize==="both"){t.innerHTML=resultsFor("pt")+resultsFor("qt");}
   else{t.innerHTML=resultsFor(state.loadSize);}
 }
@@ -828,7 +865,7 @@ function prepareFor(size){
 }
 function renderPrepare(){
   const t=document.getElementById("tab-prepare");
-  if(!state.analyzed){t.innerHTML='<div class="card"><div class="empty">Analyze a recipe first — the prep and process steps for each jar will appear here.</div></div>';return;}
+  if(!state.analyzed){t.innerHTML='<div class="card"><div class="empty">'+iconEmpty()+'Analyze a recipe first — the prep and process steps for each jar will appear here.</div></div>';return;}
   if(state.loadSize==="both"){t.innerHTML=prepareFor("pt")+prepareFor("qt");}
   else{t.innerHTML=prepareFor(state.loadSize);}
 }
@@ -856,6 +893,13 @@ function renderFAQ(q){
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
 function iconMinus(){return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--red-ink)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>';}
 function iconCheck(){return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--sage-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-6"/></svg>';}
+function iconEmpty(){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2h10"/><path d="M8 2v3l-1 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V7l-1-2V2"/><path d="M6 12h12"/></svg>';}
+function updateCtx(){
+  const el=document.getElementById("ctxline");if(!el)return;
+  const load=state.loadSize==="qt"?"4-quart load":state.loadSize==="both"?"pint + quart":"5-pint load";
+  const n=state.ings.length;
+  el.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2h10"/><path d="M8 2v3l-1 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V7l-1-2V2"/></svg>'+load+' · '+n+' ingredient'+(n===1?"":"s");
+}
 
 function switchTab(name){
   document.querySelectorAll(".tab").forEach(t=>t.classList.remove("on"));
@@ -869,7 +913,7 @@ document.querySelectorAll("#nav button").forEach(b=>b.addEventListener("click",(
 document.getElementById("importseg").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll("#importseg button").forEach(x=>x.classList.remove("on"));b.classList.add("on");setImport(b.dataset.imp);}));
 document.getElementById("loadseg").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{
-  document.querySelectorAll("#loadseg button").forEach(x=>x.classList.remove("on"));b.classList.add("on");state.loadSize=b.dataset.load;}));
+  document.querySelectorAll("#loadseg button").forEach(x=>x.classList.remove("on"));b.classList.add("on");state.loadSize=b.dataset.load;updateCtx();}));
 document.getElementById("adding").addEventListener("click",()=>{state.ings.push({name:"",amount:1,unit:"cup"});renderIngs();});
 document.getElementById("analyzebtn").addEventListener("click",()=>{state.analyzed=true;switchTab("results");});
 document.getElementById("clearbtn").addEventListener("click",()=>{
