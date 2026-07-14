@@ -192,7 +192,7 @@
           <h2 style="margin:0">Recipe name</h2>
           <button class="btn ghost" id="clearbtn" style="padding:7px 14px;font-size:13px;border-radius:10px">&#8635; Clear</button>
         </div>
-        <input type="text" id="rname" placeholder="Recipe name" value="Kimchi-Brined Fried Chicken Sandwich">
+        <input type="text" id="rname" placeholder="Recipe name">
       </div>
 
       <div class="card">
@@ -556,6 +556,9 @@ async function doImportURL(){
     if(r.name)document.getElementById("rname").value=r.name;
     parseAndLoad(r.recipeIngredient.join("\n"),msg);return;
   }
+  // For strategies 2-4, try to pull the page/recipe name
+  var pn=extractPageName(html);
+  if(pn)document.getElementById("rname").value=pn;
   // Strategy 2: microdata + common recipe plugin selectors
   var domLines=extractHtmlIngredients(html);
   if(domLines.length){parseAndLoad(domLines.join("\n"),msg);return;}
@@ -629,6 +632,16 @@ function extractIngredientSection(html){
         if(lines.length>1)return lines.join("\n");
       }
     }
+  }catch(e){}
+  return "";
+}
+function extractPageName(html){
+  try{
+    var doc=(new DOMParser()).parseFromString(html,"text/html");
+    var h1=doc.querySelector("h1");
+    if(h1){var t=h1.textContent.trim();if(t&&t.length<100)return t;}
+    var title=doc.title||"";
+    return title.replace(/\s*[\|\-–—].*$/,"").trim();
   }catch(e){}
   return "";
 }
