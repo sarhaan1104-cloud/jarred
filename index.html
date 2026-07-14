@@ -874,6 +874,12 @@ document.getElementById("adding").addEventListener("click",()=>{state.ings.push(
 document.getElementById("analyzebtn").addEventListener("click",()=>{state.analyzed=true;switchTab("results");});
 document.getElementById("clearbtn").addEventListener("click",()=>{
   document.getElementById("rname").value="";
+  const urlbox=document.getElementById("urlbox");
+  if(urlbox)urlbox.value="";
+  const impmsg=document.getElementById("impmsg");
+  if(impmsg){impmsg.className="";impmsg.textContent="";}
+  const fb=document.getElementById("fallbackbox");
+  if(fb)fb.innerHTML="";
   state.ings=[];state.analyzed=false;
   renderIngs();renderResults();renderPrepare();
   switchTab("analyze");
