@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Jarred — Pressure Canning Verifier</title>
+<style>
+  :root{
+    --green:#33443a; --green-deep:#2b3a30;
+    --cream:#efe7d8; --card:#fffdf9; --line:#e7ddc9;
+    --ink:#2c2b26; --muted:#8b8371;
+    --rust:#b26a37; --rust-soft:#f0e0d1;
+    --sage-bg:#dce4d2; --sage-ink:#46603f;
+    --slate-bg:#d8e0ea; --slate-ink:#456080;
+    --amber-bg:#f2e6d2; --amber-ink:#8a6a3c;
+    --olive-bg:#e2e3d0; --olive-ink:#5f6a3f;
+    --red-bg:#f6e0dc; --red-ink:#b0463a;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:#1b221d; font-family:var(--sans); color:var(--ink);
+    display:flex; justify-content:center; align-items:stretch; min-height:100vh;
+  }
+  .shell{
+    width:100%; max-width:434px; background:var(--cream);
+    display:flex; flex-direction:column; min-height:100vh; position:relative;
+    box-shadow:0 0 60px rgba(0,0,0,.5);
+  }
+  @media(min-width:520px){
+    .shell{min-height:800px; height:100vh; border-radius:34px; overflow:hidden; margin:auto;}
+  }
+
+  /* header */
+  header{
+    background:linear-gradient(180deg,var(--green) 0%,var(--green-deep) 100%);
+    color:#fff; padding:20px 22px 18px; flex:0 0 auto;
+  }
+  .brandrow{display:flex; align-items:center; gap:12px;}
+  .avatar{width:34px;height:34px;border-radius:50%;background:#c98a4e;display:flex;align-items:center;justify-content:center;flex:0 0 auto;}
+  .brandrow h1{font-family:var(--serif); font-size:27px; font-weight:600; margin:0; letter-spacing:.2px;}
+  .sub{margin:6px 0 0; font-size:13px; color:#c7d2c5;}
+
+  /* scroll area */
+  main{flex:1 1 auto; overflow-y:auto; padding:18px 16px 26px;}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:18px; padding:20px; margin-bottom:16px;}
+  .card h2{font-family:var(--serif); font-size:20px; font-weight:600; margin:0 0 14px;}
+  .card .hint{font-size:13.5px; color:var(--muted); margin:-6px 0 14px; line-height:1.5;}
+
+  /* segmented control */
+  .seg{display:flex; gap:8px; background:transparent;}
+  .seg button{
+    flex:1; border:1px solid var(--line); background:var(--card); color:var(--ink);
+    border-radius:13px; padding:14px 6px; font-family:var(--sans); font-size:13px; font-weight:600;
+    display:flex; flex-direction:column; align-items:center; gap:7px; cursor:pointer;
+  }
+  .seg button.on{background:var(--green); color:#fff; border-color:var(--green);}
+  .seg.small button{flex-direction:row; padding:11px 8px; gap:0; justify-content:center;}
+  .seg svg{width:20px;height:20px;}
+
+  .dropzone{
+    border:1.5px dashed #cbbfa6; border-radius:14px; padding:26px 18px; text-align:center;
+    margin-top:16px; color:var(--muted); font-size:13.5px; line-height:1.5;
+  }
+  .dropzone .cam{width:34px;height:34px;margin:0 auto 10px;color:#a99a7d;}
+  .btn{
+    background:var(--green); color:#fff; border:none; border-radius:12px;
+    padding:12px 20px; font-family:var(--sans); font-size:14px; font-weight:600; cursor:pointer;
+  }
+  .btn.block{width:100%; padding:15px; font-size:15px;}
+  .btn.rust{background:var(--rust);}
+  .btn.ghost{background:transparent; color:var(--rust); border:1px solid var(--rust-soft);}
+
+  input[type=text],input[type=number],select{
+    font-family:var(--sans); font-size:15px; color:var(--ink); background:#fff;
+    border:1px solid var(--line); border-radius:11px; padding:12px 12px; width:100%;
+  }
+  input:focus,select:focus{outline:2px solid var(--rust); outline-offset:-1px;}
+
+  .ing-row{display:grid; grid-template-columns:1fr 62px 88px 30px; gap:8px; margin-bottom:10px; align-items:center;}
+  .ing-row .x{border:none;background:var(--rust-soft);color:var(--rust);width:30px;height:30px;border-radius:50%;font-size:15px;cursor:pointer;line-height:1;}
+  .addlink{background:none;border:none;color:var(--rust);font-weight:600;font-size:14px;cursor:pointer;padding:6px 0;font-family:var(--sans);}
+
+  /* results */
+  .banner{border-radius:16px; padding:16px 18px; margin-bottom:16px; font-size:13.5px; line-height:1.55;}
+  .banner.warn{background:var(--red-bg); border:1px solid #e6b7ac;}
+  .banner.ok{background:var(--sage-bg); border:1px solid #c2d1b4;}
+  .banner .bh{display:flex; align-items:center; gap:8px; font-family:var(--serif); font-size:17px; font-weight:600; margin-bottom:8px;}
+  .banner.warn .bh{color:var(--red-ink);}
+  .banner.ok .bh{color:var(--sage-ink);}
+
+  .donutwrap{display:flex; align-items:center; gap:18px; margin-bottom:16px;}
+  .donut{width:118px;height:118px;flex:0 0 auto;}
+  .donut .lbl{font-family:var(--serif);}
+  .verdict-t{font-family:var(--serif); font-size:18px; font-weight:600; color:var(--rust); margin:0 0 4px;}
+  .verdict-s{font-size:13px; color:var(--muted); line-height:1.5; margin:0;}
+
+  .chips{display:flex; gap:10px; margin-bottom:4px;}
+  .chip{flex:1; border-radius:14px; padding:14px 8px; text-align:center;}
+  .chip b{display:block; font-family:var(--serif); font-size:22px; line-height:1;}
+  .chip span{font-size:12px; display:block; margin-top:5px;}
+  .chip.inj{background:var(--sage-bg); color:var(--sage-ink);}
+  .chip.frz{background:var(--slate-bg); color:var(--slate-ink);}
+  .chip.frs{background:var(--amber-bg); color:var(--amber-ink);}
+  .chip.rev{background:var(--red-bg); color:var(--red-ink);}
+
+  .brk-row{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:13px 0; border-bottom:1px solid var(--line);}
+  .brk-row:last-child{border-bottom:none;}
+  .brk-row .nm{font-size:15px;}
+  .pill{font-size:11px; font-weight:700; letter-spacing:.4px; padding:6px 11px; border-radius:20px; white-space:nowrap;}
+  .pill.inj{background:var(--sage-bg); color:var(--sage-ink);}
+  .pill.frz{background:var(--slate-bg); color:var(--slate-ink);}
+  .pill.frs{background:var(--amber-bg); color:var(--amber-ink);}
+  .pill.prep{background:var(--olive-bg); color:var(--olive-ink);}
+  .pill.rev{background:var(--red-bg); color:var(--red-ink);}
+  .pill.seas{background:#efe9dc; color:var(--muted);}
+
+  .proc-line{display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--line); font-size:14.5px;}
+  .proc-line:last-child{border-bottom:none;}
+  .proc-line .k{color:var(--muted);}
+  .proc-line .v{font-weight:600;}
+  .rules li{font-size:13px; color:#5c574c; line-height:1.5; margin-bottom:6px;}
+  .disc{font-size:12px; color:var(--muted); line-height:1.5; margin-top:14px; padding-top:14px; border-top:1px solid var(--line);}
+
+  .scale-box{background:var(--sage-bg); color:var(--sage-ink); border-radius:12px; padding:13px 15px; font-size:13.5px; line-height:1.55; margin-bottom:14px;}
+  .scale-box b{font-family:var(--serif); font-size:15px;}
+  .plan-method{font-size:13.5px; line-height:1.6; color:#4c473d; background:#f3eee2; border-radius:12px; padding:14px 15px; margin-bottom:16px;}
+  .plan-method b{color:var(--ink);}
+  .plan-lab{font-size:12px; font-weight:700; letter-spacing:.5px; color:var(--muted); text-transform:uppercase; margin:2px 0 10px;}
+  .plan-steps{counter-reset:s; list-style:none; padding:0; margin:0 0 8px;}
+  .plan-steps li{position:relative; padding:0 0 13px 32px; font-size:14px; line-height:1.55; color:#3f3b33;}
+  .plan-steps li:before{counter-increment:s; content:counter(s); position:absolute; left:0; top:-1px; width:22px; height:22px; background:var(--rust); color:#fff; border-radius:50%; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; font-family:var(--sans);}
+  .plan-hand{font-size:13px; line-height:1.6; color:#5c574c; margin-top:10px; padding-top:12px; border-top:1px solid var(--line);}
+  .plan-hand .tag{font-weight:700; color:var(--ink);}
+
+  /* reference */
+  .search{position:relative; margin-bottom:6px;}
+  .faq{border-bottom:1px solid var(--line); padding:16px 0;}
+  .faq:last-child{border-bottom:none;}
+  .faq q{display:block; font-family:var(--serif); font-size:16px; font-weight:600; font-style:normal; margin-bottom:7px;}
+  .faq p{margin:0; font-size:13.5px; color:#5c574c; line-height:1.55;}
+
+  .kv{font-size:14px; line-height:1.7; color:#4c473d;}
+
+  /* nav */
+  nav{
+    flex:0 0 auto; background:var(--card); border-top:1px solid var(--line);
+    display:flex; padding:8px 6px 12px;
+  }
+  nav button{flex:1; background:none; border:none; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:4px; color:var(--muted); font-family:var(--sans); font-size:11px; font-weight:600;}
+  nav button svg{width:22px;height:22px;}
+  nav button.on{color:var(--rust);}
+
+  .tab{display:none;} .tab.on{display:block;}
+  .empty{text-align:center; color:var(--muted); font-size:14px; padding:40px 20px; line-height:1.6;}
+  textarea.paste{width:100%; min-height:132px; margin-top:6px; font-family:var(--sans); font-size:14px; color:var(--ink); background:#fff; border:1px solid var(--line); border-radius:11px; padding:12px; resize:vertical; line-height:1.5;}
+  textarea.paste:focus{outline:2px solid var(--rust); outline-offset:-1px;}
+  .impmsg{font-size:13px; line-height:1.5; margin-top:10px; padding:10px 12px; border-radius:10px;}
+  .impmsg.ok{background:var(--sage-bg); color:var(--sage-ink);}
+  .impmsg.info{background:#eef1e9; color:#5c6b52;}
+</style>
+</head>
+<body>
+<div class="shell">
+  <header>
+    <div class="brandrow">
+      <div class="avatar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l3 3v3H6z"/><path d="M6 8h12v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1z"/><path d="M10 13h4"/></svg>
+      </div>
+      <h1>Jarred</h1>
+    </div>
+    <p class="sub">Pressure canning verifier · Nesco 9.5qt</p>
+  </header>
+
+  <main>
+    <!-- ANALYZE -->
+    <section class="tab on" id="tab-analyze">
+      <div class="card">
+        <h2>Import a recipe</h2>
+        <div class="seg" id="importseg">
+          <button class="on" data-imp="photo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Photo</button>
+          <button data-imp="screenshot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>Screenshot</button>
+          <button data-imp="website"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>Website</button>
+        </div>
+        <div id="importbody"></div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <h2 style="margin:0">Recipe name</h2>
+          <button class="btn ghost" id="clearbtn" style="padding:7px 14px;font-size:13px;border-radius:10px">&#8635; Clear</button>
+        </div>
+        <input type="text" id="rname" placeholder="Recipe name" value="Kimchi-Brined Fried Chicken Sandwich">
+      </div>
+
+      <div class="card">
+        <h2>Ingredients</h2>
+        <p class="hint">Imported ingredients land here for review — edit anything before analyzing.</p>
+        <div id="inglist"></div>
+        <button class="addlink" id="adding">+ Add ingredient</button>
+      </div>
+
+      <button class="btn block rust" id="analyzebtn">Analyze recipe</button>
+    </section>
+
+    <!-- RESULTS -->
+    <section class="tab" id="tab-results"></section>
+
+    <!-- PREPARE -->
+    <section class="tab" id="tab-prepare"></section>
+
+    <!-- REFERENCE -->
+    <section class="tab" id="tab-reference">
+      <div class="card">
+        <div class="search"><input type="text" id="faqsearch" placeholder="Search canning tips..."></div>
+        <div id="faqlist"></div>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section class="tab" id="tab-settings">
+      <div class="card">
+        <h2>Equipment</h2>
+        <div class="kv">Nesco 9.5 qt electric pressure canner<br>Load = 5 pints OR 4 quarts<br>Vacuum sealer (freezer pathway)</div>
+      </div>
+      <div class="card">
+        <h2>Load size preference</h2>
+        <div class="seg small" id="loadseg">
+          <button class="on" data-load="pt">5 Pint</button>
+          <button data-load="qt">4 Quart</button>
+          <button data-load="both">Show Both</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>About this app</h2>
+        <div class="kv" style="color:#5c574c;font-size:13.5px;line-height:1.6;">Rules sourced from the USDA Complete Guide to Home Canning (2015) and the Ball Complete Book of Home Preserving, plus USDA freezing guidance for the vacuum-seal pathway. Preview build — runs entirely on-device once compiled to Android.</div>
+      </div>
+    </section>
+  </main>
+
+  <nav id="nav">
+    <button class="on" data-tab="analyze"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Analyze</button>
+    <button data-tab="results"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2h8"/><path d="M9 2v3l-2 3v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V8l-2-3V2"/><path d="M7 13h10"/></svg>Results</button>
+    <button data-tab="prepare"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6a1 1 0 0 1 1 1v0h1a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h1a1 1 0 0 1 1-1z"/><path d="M9 12l1.5 1.5L13 11"/><path d="M15 12.5h1.5"/><path d="M9 16.5l1.5 1.5L13 15.5"/><path d="M15 17h1.5"/></svg>Prepare</button>
+    <button data-tab="reference"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Reference</button>
+    <button data-tab="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</button>
+  </nav>
+</div>
+
+<script>
+/* ============================ DATA (whitelist) ============================ */
+const DATA = {
+  altitude:{ dial:[[0,2000,11],[2001,4000,12],[4001,6000,13],[6001,8000,14],[8001,10000,15]],
+             weighted:[[0,1000,10],[1001,10000,15]] },
+  p1:{
+    meat_redMeat:{name:"Red meat (beef, pork, lamb, venison)",aliases:["beef","pork","lamb","veal","venison","bear","goat","chuck","short rib","stew meat","steak","roast","shoulder","loin","brisket"],time:{pt:75,qt:90},hs:1},
+    meat_ground:{name:"Ground / chopped meat",aliases:["ground beef","ground pork","ground meat","chopped meat","sausage","meatball","burger","mince","ground chicken","ground turkey"],time:{pt:75,qt:90},hs:1},
+    poultry_boneless:{name:"Poultry / rabbit, boneless",aliases:["chicken","turkey","rabbit","chicken thigh","chicken breast","boneless chicken","poultry","chicken thighs"],time:{pt:75,qt:90},hs:1.25},
+    poultry_bonein:{name:"Poultry / rabbit, bone-in",aliases:["bone-in chicken","chicken with bones","turkey bone-in"],time:{pt:65,qt:75},hs:1.25},
+    stock_broth:{name:"Meat / poultry stock (broth)",aliases:["stock","broth","bone broth","chicken stock","beef stock","chicken broth","beef broth"],liquid:true,time:{pt:20,qt:25},hs:1},
+    seafood_fish:{name:"Fish",aliases:["fish","salmon","trout","tuna","mackerel","cod"],time:{pt:100,qt:null},hs:1},
+    veg_asparagus:{name:"Asparagus",aliases:["asparagus"],time:{pt:30,qt:40},hs:1},
+    veg_beans_snap:{name:"Snap / green beans",aliases:["green bean","snap bean","wax bean","string bean","green beans"],time:{pt:20,qt:25},hs:1},
+    veg_beans_lima:{name:"Lima / butter beans",aliases:["lima bean","butter bean"],time:{pt:40,qt:50},hs:1},
+    veg_beets:{name:"Beets",aliases:["beet","beets"],time:{pt:30,qt:35},hs:1},
+    veg_carrots:{name:"Carrots",aliases:["carrot","carrots"],time:{pt:25,qt:30},hs:1},
+    veg_corn:{name:"Corn, whole kernel",aliases:["corn","sweet corn","whole kernel corn"],time:{pt:55,qt:85},hs:1},
+    veg_greens:{name:"Greens / spinach",aliases:["spinach","kale","collard","greens","chard","mustard greens"],time:{pt:70,qt:90},hs:1},
+    veg_mixed:{name:"Mixed vegetables (tested combo)",aliases:["mixed vegetables","mixed veg"],time:{pt:75,qt:90},hs:1},
+    veg_mushrooms:{name:"Mushrooms, whole/sliced (domestic)",aliases:["mushroom","mushrooms","button mushroom","cremini","white mushroom"],time:{pt:45,qt:null},hs:1},
+    veg_okra:{name:"Okra",aliases:["okra"],time:{pt:25,qt:40},hs:1},
+    veg_peas:{name:"Peas, green / English",aliases:["green pea","english pea","shelled pea","peas"],time:{pt:40,qt:40},hs:1},
+    veg_peppers:{name:"Peppers",aliases:["pepper","bell pepper","hot pepper","chile","jalapeno"],time:{pt:35,qt:null},hs:1},
+    veg_potatoes:{name:"Potatoes (cubed/whole)",aliases:["potato","potatoes","white potato"],time:{pt:35,qt:40},hs:1},
+    veg_pumpkin:{name:"Pumpkin / winter squash, cubed",aliases:["pumpkin","winter squash","butternut","acorn squash"],time:{pt:55,qt:90},hs:1},
+    veg_sweetpotato:{name:"Sweet potatoes (pieces)",aliases:["sweet potato","yam"],time:{pt:65,qt:90},hs:1},
+    veg_beans_dried:{name:"Dried beans/peas (rehydrated)",aliases:["dried bean","pinto bean","kidney bean","black bean","navy bean","chickpea","dried pea","legume"],time:{pt:75,qt:90},hs:1},
+    tomato_crushed:{name:"Tomatoes, crushed (acidified)",aliases:["crushed tomato","tomato"],time:{pt:15,qt:15},hs:0.5,acid:true}
+  },
+  soup:{time:{pt:60,qt:75}, seafood:{pt:100,qt:100}, hs:1,
+    rules:["Every solid must have its own tested recommendation (no cabbage, broccoli, cured meats).",
+           "Fill jar HALFWAY with solids, then cover with liquid (1:1) — a safety requirement.",
+           "Boil the mixture 5 min before packing; pre-cook meat; fully rehydrate dried beans.",
+           "No thickeners (flour, cornstarch, Clearjel). No dairy. No pasta/rice.",
+           "Any seafood present → whole jar processes at 100 min."]},
+  prepBrine:{route:"prep", reason:"Brine / marinade — used before canning, then discarded. Not packed in the jar.",
+    items:["kimchi juice","brine","marinade","pickle juice","dill brine","buttermilk brine"]},
+  blocks:{
+    thickeners:{route:"frz", reason:"Thickeners slow heat penetration to the jar core (under-processing risk). Thicken after opening.",
+      items:["flour","cornstarch","corn starch","arrowroot","roux","tapioca","starch","gravy mix","cornflour","all-purpose flour"]},
+    concentrates:{route:"frz", reason:"Concentrated/dehydrated low-acid flavorings have no tested in-jar process. Build into a frozen sauce.",
+      items:["mushroom powder","dehydrated mushroom","dried mushroom","porcini powder","tomato powder","vegetable powder","bouillon","stock concentrate","demi-glace"]},
+    alcohol:{route:"frz", reason:"Wine/spirits aren't an approved jar liquid. Simmer into a frozen sauce (also mellows raw alcohol).",
+      items:["red wine","white wine","wine","beer","sherry","vermouth","brandy","bourbon","rum","marsala"]},
+    dairy:{route:"frs", reason:"Low-acid; curdles/separates and can fail the seal. Add fresh at serving.",
+      items:["milk","cream","heavy cream","half and half","butter","cheese","parmesan","cheddar","mozzarella","sour cream","yogurt","buttermilk","cream cheese","evaporated milk"]},
+    grains:{route:"frs", reason:"Swell and turn to paste; heat unevenly. Cook fresh and add at serving.",
+      items:["pasta","noodle","noodles","macaroni","spaghetti","rice","barley","quinoa","orzo","dumpling","couscous","egg noodle"]},
+    eggs:{route:"frs", reason:"No research-tested process for home-canned eggs.", items:["egg","eggs","hard boiled egg"]},
+    oils:{route:"frs", reason:"Excess oil insulates food and coats the seal. Up to ~1 tbsp for browning is fine; the rest goes fresh.",
+      items:["olive oil","vegetable oil","canola oil","oil","lard","duck fat","schmaltz","bacon grease","ghee"]},
+    cured:{route:"frs", reason:"Cured/brined meats aren't allowed in the soup pathway; use only inside a specific tested recipe.",
+      items:["bacon","ham","cured ham","prosciutto","pancetta","cured sausage","salami","pepperoni","corned beef"]},
+    untestedVeg:{route:"frs", reason:"No USDA-tested process; texture also degrades badly under pressure.",
+      items:["cabbage","broccoli","cauliflower","celery","brussels sprout","summer squash","zucchini","eggplant","kohlrabi","lettuce","bok choy","artichoke"]},
+    condiments:{route:"frs", reason:"Condiments/emulsions — add fresh at serving.",
+      items:["mayonnaise","mayo","dijon","yellow mustard","prepared mustard","ketchup","relish","hot sauce","bbq sauce","pickle","pickles"]},
+    bread:{route:"frs", reason:"Breads / assembly items — serve fresh.",
+      items:["bun","buns","bread","roll","rolls","tortilla","brioche","crouton","breadcrumb","panko","biscuit"]},
+    puree:{route:"rev", reason:"Pureed/mashed low-acid foods have NO tested process — heat can't be guaranteed to reach the center.",
+      items:["puree","pureed","mashed","refried","mashed potato","mashed squash","meat paste"]}
+  },
+  seasonings:["salt","pepper","black pepper","white pepper","sugar","cumin","paprika","smoked paprika","chili powder","garlic powder","onion powder","oregano","basil","thyme","bay leaf","herbes de provence","italian seasoning","red pepper flakes","cinnamon","gochugaru","ginger","turmeric","coriander","dried herb","dried spice","garlic","ginger powder"]
+};
+
+/* ============================ ROUTER ============================ */
+class StagingRouter{
+  constructor(d){this.d=d;}
+  _n(s){return (s||"").toLowerCase().trim();}
+  _best(name,list){const n=this._n(name);let b=0;for(const a of list){const al=this._n(a);if(al&&n.includes(al)&&al.length>b)b=al.length;}return b;}
+  classify(name){
+    const c=[];
+    // brine/prep — priority 2 so it wins ties (e.g. buttermilk brine)
+    const pb=this._best(name,this.d.prepBrine.items);
+    if(pb) c.push({len:pb,pri:2,r:{pw:"prep",cat:"prepBrine",reason:this.d.prepBrine.reason}});
+    // seasonings
+    const s=this._best(name,this.d.seasonings);
+    if(s) c.push({len:s,pri:1,r:{pw:"seas",cat:"seasoning",reason:"Flavor only — not counted toward jar fill."}});
+    // blocks
+    for(const k in this.d.blocks){const bl=this.d.blocks[k];const L=this._best(name,bl.items);
+      if(L) c.push({len:L,pri:1,r:{pw:bl.route,cat:k,reason:bl.reason}});}
+    // whitelist
+    for(const k in this.d.p1){const p=this.d.p1[k];const L=this._best(name,p.aliases);
+      if(L) c.push({len:L,pri:0,r:{pw:"inj",cat:k,proc:p,reason:"Matches a tested USDA process."}});}
+    if(!c.length) return {pw:"rev",cat:"unknown",reason:"No tested process found — verify manually against the USDA guide before canning."};
+    c.sort((a,b)=>(b.len-a.len)||(b.pri-a.pri));
+    return c[0].r;
+  }
+  _psi(gauge,ft){const t=gauge==="weighted"?this.d.altitude.weighted:this.d.altitude.dial;
+    for(const row of t){if(ft>=row[0]&&ft<=row[1])return row[2];}return t[t.length-1][2];}
+  jarProcess(inj,jarSize,ft,gauge){
+    const psi=this._psi(gauge,ft),w=[];
+    const liquids=inj.filter(i=>i.proc&&i.proc.liquid);
+    const solids=inj.filter(i=>!(i.proc&&i.proc.liquid));
+    if(!solids.length){
+      if(liquids.length){const st=liquids[0].proc;const t=st.time[jarSize];
+        return {jp:t==null?null:{t,psi,hs:st.hs,basis:st.name},verdict:"SINGLE",w};}
+      return {jp:null,verdict:"NONE",w:["No tested in-jar ingredients. Nothing to can as written."]};
+    }
+    solids.forEach(i=>{if(i.proc.time[jarSize]==null)w.push(i.proc.name+" has no tested process for "+(jarSize==="pt"?"pints":"quarts")+" — use the other jar size.");});
+    const seafood=solids.some(i=>i.cat==="seafood_fish"||/seafood|shrimp|crab|clam|oyster/.test(this._n(i.name)));
+    if(solids.length===1){const o=solids[0];const t=o.proc.time[jarSize];
+      return {jp:t==null?null:{t,psi,hs:o.proc.hs,basis:o.proc.name},verdict:"SINGLE",w};}
+    const st=seafood?this.d.soup.seafood[jarSize]:this.d.soup.time[jarSize];
+    w.push("Multiple tested foods in one jar → USDA 'your choice' soup pathway (half solids / half liquid, no thickeners/dairy/pasta).");
+    if(seafood)w.push("Seafood present → whole jar held at 100 min.");
+    return {jp:{t:st,psi,hs:this.d.soup.hs,basis:"USDA 'your choice' soup",soup:true},verdict:"SOUP",w};
+  }
+  stage(ings,opt){
+    const b={inj:[],frz:[],frs:[],prep:[],rev:[],seas:[]};const w=[];
+    ings.forEach(ing=>{const c=this.classify(ing.name);
+      const e=Object.assign({name:ing.name,cups:toCups(ing.amount,ing.unit,ing.name)},c);
+      (b[c.pw]||b.rev).push(e);});
+    const res=this.jarProcess(b.inj,opt.jarSize,opt.ft||0,opt.gauge||"dial");
+    const jarCups=b.inj.reduce((s,i)=>s+i.cups,0);
+    const outCups=[...b.frz,...b.frs,...b.rev].reduce((s,i)=>s+i.cups,0);
+    const tot=jarCups+outCups;
+    const pct=v=>tot?Math.round(v/tot*100):0;
+    return {b,jp:res.jp,verdict:res.verdict,warnings:w.concat(res.w),
+      pctIn:pct(jarCups),pctFrz:pct(b.frz.reduce((s,i)=>s+i.cups,0)),
+      pctFrs:pct(b.frs.reduce((s,i)=>s+i.cups,0)),pctRev:pct(b.rev.reduce((s,i)=>s+i.cups,0))};
+  }
+}
+function toCups(amt,unit,name){
+  amt=parseFloat(amt)||0;
+  const meat=/chicken|beef|pork|lamb|turkey|fish|meat|thigh|breast/i.test(name);
+  switch((unit||"").toLowerCase()){
+    case "cup":return amt;
+    case "tbsp":return amt/16; case "tsp":return amt/48;
+    case "oz":return amt/8; case "lb":return amt*(meat?1.9:2);
+    case "each":case "ea":return amt*0.5; default:return amt;
+  }
+}
+
+/* ---- paste-and-parse a recipe's ingredient list (offline, no fetch) ---- */
+function parseRecipeText(text){
+  const UFRAC={"½":.5,"¼":.25,"¾":.75,"⅓":1/3,"⅔":2/3,"⅛":.125,"⅜":.375,"⅝":.625,"⅞":.875,"⅕":.2,"⅖":.4,"⅙":1/6};
+  const UNIT={cup:"cup",cups:"cup",tbsp:"tbsp",tablespoon:"tbsp",tablespoons:"tbsp",tsp:"tsp",teaspoon:"tsp",teaspoons:"tsp",oz:"oz",ounce:"oz",ounces:"oz",lb:"lb",lbs:"lb",pound:"lb",pounds:"lb",clove:"each",cloves:"each",can:"each",cans:"each",each:"each",g:"oz",gram:"oz",grams:"oz"};
+  const toNum=t=>{t=(t||"").trim();if(UFRAC[t]!=null)return UFRAC[t];
+    let m=t.match(/^(\d+)([½¼¾⅓⅔⅛⅜⅝⅞⅕⅖⅙])$/);if(m)return +m[1]+UFRAC[m[2]];
+    if(/^\d+\/\d+$/.test(t)){const p=t.split("/");return +p[0]/+p[1];}
+    if(/^\d*\.?\d+$/.test(t))return parseFloat(t);return null;};
+  const out=[];
+  text.split(/\r?\n/).forEach(raw=>{
+    let s=raw.trim();
+    if(!s) return;
+    if(/[:：]\s*$/.test(s)) return;                       // "For the brine:" header
+    if(s.split(/\s+/).length>14) return;                  // long line = an instruction
+    s=s.replace(/\([^)]*\)/g," ");                        // drop "(14 oz)" notes
+    s=s.replace(/^[•\-\u2022\*\d]+[.)]\s*/,"");            // leading bullets / "1." step numbers
+    s=s.replace(/(\d)\s*[-–]\s*(\d)/g,"$1 - $2");          // "2-3" -> "2 - 3"
+    s=s.replace(/(\d)([½¼¾⅓⅔⅛⅜⅝⅞⅕⅖⅙])/g,"$1 $2");         // "1½" -> "1 ½"
+    let toks=s.split(/\s+/).filter(Boolean);
+    if(!toks.length) return;
+    let amt=null, n0=toNum(toks[0]);
+    if(n0!=null){
+      amt=n0; toks.shift();
+      const n1=toNum(toks[0]);
+      if(n1!=null && n1<1){ amt+=n1; toks.shift(); }        // mixed number "1 1/2"
+      if(toks[0]==="-"||toks[0]==="–"||toks[0]==="to"){ toks.shift(); if(toNum(toks[0])!=null) toks.shift(); } // range -> keep low
+    }
+    let unit="each";
+    if(toks.length){ const u=toks[0].toLowerCase().replace(/[.,]/g,"");
+      if(UNIT[u]){ unit=UNIT[u]; toks.shift(); } }
+    if(toks[0] && toks[0].toLowerCase()==="of") toks.shift();
+    let name=toks.join(" ").split(",")[0].trim();          // drop prep notes after a comma
+    if(!name) return;
+    out.push({name, amount:Math.round((amt==null?1:amt)*100)/100, unit});
+  });
+  return out.slice(0,50);
+}
+
+/* ============================ APP STATE ============================ */
+const router=new StagingRouter(DATA);
+const state={
+  loadSize:"pt",
+  ings:[
+    {name:"boneless chicken thighs",amount:2,unit:"lb"},
+    {name:"kimchi juice",amount:0.5,unit:"cup"},
+    {name:"buttermilk",amount:1,unit:"cup"},
+    {name:"egg",amount:1,unit:"each"},
+    {name:"all-purpose flour",amount:1,unit:"cup"},
+    {name:"mayonnaise",amount:0.25,unit:"cup"},
+    {name:"cabbage",amount:1,unit:"cup"},
+    {name:"vegetable oil",amount:0.25,unit:"cup"},
+    {name:"gochugaru",amount:1,unit:"tsp"},
+    {name:"salt",amount:1,unit:"tsp"},
+    {name:"brioche bun",amount:1,unit:"each"}
+  ]
+};
+const UNITS=["cup","tbsp","tsp","oz","lb","each"];
+const PILL={inj:["inj","IN-JAR"],frz:["frz","FREEZE"],frs:["frs","FRESH"],prep:["prep","PREP"],rev:["rev","REVIEW"],seas:["seas","SEASONING"]};
+
+/* ============================ RENDER: analyze ============================ */
+function renderIngs(){
+  const box=document.getElementById("inglist");box.innerHTML="";
+  state.ings.forEach((ing,idx)=>{
+    const row=document.createElement("div");row.className="ing-row";
+    row.innerHTML=
+      '<input type="text" value="'+esc(ing.name)+'" data-i="'+idx+'" data-f="name">'+
+      '<input type="number" step="0.25" value="'+ing.amount+'" data-i="'+idx+'" data-f="amount">'+
+      '<select data-i="'+idx+'" data-f="unit">'+UNITS.map(u=>'<option'+(u===ing.unit?" selected":"")+'>'+u+'</option>').join("")+'</select>'+
+      '<button class="x" data-del="'+idx+'">×</button>';
+    box.appendChild(row);
+  });
+  box.querySelectorAll("input,select").forEach(el=>el.addEventListener("input",e=>{
+    const i=+e.target.dataset.i,f=e.target.dataset.f;state.ings[i][f]=e.target.value;}));
+  box.querySelectorAll("[data-del]").forEach(b=>b.addEventListener("click",e=>{
+    state.ings.splice(+e.target.dataset.del,1);renderIngs();}));
+}
+const IMPORT_BODY={
+  photo:'<div class="dropzone"><div class="cam"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></div>Snap a photo of a printed recipe card, cookbook page, or magazine clipping.<div style="margin-top:14px"><button class="btn">Open camera</button></div><div style="margin-top:10px;font-size:12px">On-device text capture runs in the compiled Android build. For now, add ingredients below.</div></div>',
+  screenshot:'<div class="dropzone">Drop or pick a screenshot of a recipe. On-device text capture runs in the compiled Android build — add ingredients below for now.</div>',
+website:'<div style="margin-top:16px">'+
+    '<input type="text" id="urlbox" placeholder="Paste a recipe URL here..." style="margin-bottom:10px">'+
+    '<div style="display:flex;gap:8px;margin-bottom:10px">'+
+      '<button class="btn" style="flex:1" id="fetchbtn">Import from URL</button>'+
+      '<button class="btn ghost" style="flex:1" id="clipbtn">Clipboard</button>'+
+    '</div>'+
+    '<div id="impmsg"></div>'+
+    '<div id="fallbackbox"></div></div>'
+};
+function setImport(kind){
+  document.getElementById("importbody").innerHTML=IMPORT_BODY[kind];
+  if(kind==="website"){
+    document.getElementById("fetchbtn").addEventListener("click",doImportURL);
+    document.getElementById("clipbtn").addEventListener("click",doImportClipboard);
+  }
+}
+async function doImportURL(){
+  const urlEl=document.getElementById("urlbox");
+  const msg=document.getElementById("impmsg");
+  const url=(urlEl?urlEl.value:"").trim();
+  if(!url){msg.className="impmsg info";msg.textContent="Paste a recipe URL above first.";return;}
+  msg.className="impmsg info";msg.textContent="Fetching recipe…";
+  try{
+    const proxy="https://api.allorigins.win/get?url="+encodeURIComponent(url);
+    const res=await fetch(proxy,{signal:AbortSignal.timeout(12000)});
+    if(!res.ok)throw new Error("HTTP "+res.status);
+    const data=await res.json();
+    const html=data.contents||"";
+    // Try JSON-LD Recipe schema first
+    const ldBlocks=html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)||[];
+    for(const blk of ldBlocks){
+      const inner=blk.replace(/<[^>]+>/g,"");
+      try{
+        let ld=JSON.parse(inner);
+        if(!Array.isArray(ld))ld=[ld];
+        const recipe=ld.find(x=>x&&x["@type"]==="Recipe");
+        if(recipe&&recipe.recipeIngredient&&recipe.recipeIngredient.length){
+          const text=recipe.recipeIngredient.join("\n");
+          if(recipe.name)document.getElementById("rname").value=recipe.name;
+          parseAndLoad(text,msg);return;
+        }
+      }catch(e){}
+    }
+    // Fallback: strip tags and try to parse lines
+    const stripped=html.replace(/<[^>]+>/g," ").replace(/[ \t]+/g," ").replace(/ \n/g,"\n").replace(/\n /g,"\n");
+    parseAndLoad(stripped,msg);
+  }catch(err){
+    msg.className="impmsg info";
+    msg.textContent="Could not reach that URL — try Clipboard, or paste ingredients manually.";
+    showFallback(msg);
+  }
+}
+async function doImportClipboard(){
+  const msg=document.getElementById("impmsg");
+  try{
+    const text=await navigator.clipboard.readText();
+    parseAndLoad(text,msg);
+  }catch(e){
+    msg.className="impmsg info";
+    msg.textContent="Clipboard access denied — paste ingredients into the box below.";
+    showFallback(msg);
+  }
+}
+function showFallback(msg){
+  const fb=document.getElementById("fallbackbox");
+  if(!fb||document.getElementById("pastebox"))return;
+  fb.innerHTML="<p class='hint' style='margin:12px 0 8px'>Or paste ingredients here:</p>"+
+    "<textarea class='paste' id='pastebox' style='margin-bottom:8px'></textarea>"+
+    "<button class='btn block' id='manualbtn'>Add ingredients</button>";
+  document.getElementById("manualbtn").addEventListener("click",()=>parseAndLoad(document.getElementById("pastebox").value,msg));
+}
+function parseAndLoad(text,msg){
+  const parsed=parseRecipeText(text);
+  if(!parsed.length){
+    msg.className="impmsg info";
+    msg.textContent="No ingredients found — try pasting them manually.";
+    showFallback(msg);
+    return;
+  }
+  state.ings=parsed;state.analyzed=false;
+  renderIngs();
+  msg.className="impmsg ok";
+  msg.textContent=parsed.length+" ingredient"+(parsed.length===1?"":"s")+" added — review below, then tap Analyze recipe.";
+  document.querySelector(".card:nth-of-type(3)")?.scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+/* ============================ RENDER: results ============================ */
+function donutSVG(pct){
+  const r=52,c=2*Math.PI*r,off=c*(1-pct/100);
+  return '<svg class="donut" viewBox="0 0 118 118">'+
+    '<circle cx="59" cy="59" r="'+r+'" fill="none" stroke="#eadfce" stroke-width="12"/>'+
+    '<circle cx="59" cy="59" r="'+r+'" fill="none" stroke="var(--rust)" stroke-width="12" stroke-linecap="round" stroke-dasharray="'+c+'" stroke-dashoffset="'+off+'" transform="rotate(-90 59 59)"/>'+
+    '<text class="lbl" x="59" y="56" text-anchor="middle" font-size="26" font-weight="700" fill="var(--ink)">'+pct+'%</text>'+
+    '<text x="59" y="74" text-anchor="middle" font-size="11" fill="var(--muted)" letter-spacing="1">IN-JAR</text></svg>';
+}
+function procCard(jp,verdict,size){
+  if(!jp) return '<div class="card"><h2>Jar process</h2><p class="hint" style="margin:0">Nothing maps to a tested in-jar process. Can the components separately, or route them to freeze / fresh.</p></div>';
+  const label=size==="pt"?"pints":"quarts";
+  let h='<div class="card"><h2>Jar process</h2>'+
+    '<div class="proc-line"><span class="k">Basis</span><span class="v">'+esc(jp.basis)+'</span></div>'+
+    '<div class="proc-line"><span class="k">Process ('+label+')</span><span class="v">'+jp.t+' min</span></div>'+
+    '<div class="proc-line"><span class="k">Pressure</span><span class="v">'+jp.psi+' PSI (dial)</span></div>'+
+    '<div class="proc-line"><span class="k">Headspace</span><span class="v">'+jp.hs+' in</span></div>';
+  if(jp.soup){h+='<ul class="rules" style="margin:14px 0 0;padding-left:18px">'+DATA.soup.rules.map(r=>'<li>'+esc(r)+'</li>').join("")+'</ul>';}
+  h+='</div>';return h;
+}
+/* ---- canning plan (load setup, jar method, staging, scaling) ---- */
+const LOADN={pt:5,qt:4};                 // Nesco 9.5qt: 5 pints OR 4 quarts
+const DENSEJAR={pt:1.5,qt:3.0};          // ~solids per jar, dense single-food pack
+const SOUPJAR={pt:0.9,qt:1.75};          // ~solids per jar, half-liquid soup
+const fmtCups=c=>{c=Math.round(c*10)/10;return c+(c===1?" cup":" cups");};
+const shortFood=n=>n.split("(")[0].trim().toLowerCase();
+
+function planCard(res,size){
+  const solids=res.b.inj.filter(i=>!(i.proc&&i.proc.liquid));
+  if(!solids.length||!res.jp) return "";
+  const sizeWord=size==="pt"?"pint":"quart";
+  const loadN=LOADN[size], psi=res.jp.psi, t=res.jp.t, hs=res.jp.hs;
+
+  // distinct tested foods in the jar
+  const foods=[];
+  solids.forEach(s=>{let f=foods.find(x=>x.name===s.proc.name);
+    if(!f){f={name:s.proc.name,proc:s.proc,items:[]};foods.push(f);}f.items.push(s);});
+
+  // scaling to a full load
+  const perJar=res.verdict==="SOUP"?SOUPJAR[size]:DENSEJAR[size];
+  const curSolid=solids.reduce((a,i)=>a+i.cups,0);
+  const targetSolid=loadN*perJar;
+  let scale=curSolid>0?targetSolid/curSolid:1; if(!isFinite(scale)||scale<=0)scale=1;
+  const scaleR=Math.round(scale*100)/100;
+  const dir=scaleR>1?"scale up":scaleR<1?"scale down":"as written";
+  const scaledCore=solids.map(s=>esc(s.name)+" → "+fmtCups(s.cups*scale)).join(" · ");
+  const scaleBox='<div class="scale-box">To fill a full <b>'+loadN+'-'+sizeWord+'</b> load you need ≈ '+fmtCups(targetSolid)+
+    ' of prepped core. Your recipe yields ≈ '+fmtCups(curSolid)+' → multiply every ingredient <b>×'+scaleR+'</b> ('+dir+').'+
+    '<div style="margin-top:8px;font-size:12.5px;opacity:.85">Scaled core: '+scaledCore+'</div></div>';
+
+  // method text
+  let method;
+  if(foods.length===1){
+    method='<div class="plan-method"><b>1-jar method</b> — single-component pack. The cannable core is one tested food ('+
+      shortFood(foods[0].name)+'), so every jar in the load is the same thing. Everything else is staged outside the jar.</div>';
+  }else{
+    const longest=Math.max(...foods.map(f=>f.proc.time[size]||0));
+    method='<div class="plan-method"><b>Two ways to jar this — pick one:</b><br><br>'+
+      '<b>A · One-jar (soup):</b> combine all '+foods.length+' foods in every jar, half solids / half liquid, '+t+' min. Simplest; every jar is the same blend.<br><br>'+
+      '<b>B · Component jars:</b> give each food its own jars — '+
+      foods.map(f=>shortFood(f.name)+' ('+ (f.proc.time[size]==null?"other size":f.proc.time[size]+" min") +')').join(", ")+
+      '. More prep, but one session stocks several different meals. Run in the same load and all jars hold at the longest time ('+longest+' min).<br><br>'+
+      'Steps below follow <b>method A</b>.</div>';
+  }
+
+  // packing / staging steps
+  const steps=[];
+  if(res.b.prep.length){
+    steps.push("Brine first: soak "+res.b.prep.map(i=>esc(i.name)).join(", ")+" for the recipe's marinating time, then <b>drain and discard the brine</b> — it never goes in the jar.");
+  }
+  if(res.verdict==="SOUP"){
+    steps.push("Prep each solid by its own hot-pack directions (pre-cook meat until tender; fully rehydrate any dried beans).");
+    steps.push("Combine the solids, cover with boiling broth, water, or tomatoes, and boil 5 minutes. <b>Do not thicken.</b>");
+    steps.push("Fill each of the "+loadN+" "+sizeWord+" jars <b>halfway with solids</b>, then add liquid to "+hs+'" headspace.');
+    steps.push("Remove air bubbles, wipe rims, seat lids fingertip-tight.");
+    steps.push("Process all "+loadN+" jars at "+psi+" PSI for <b>"+t+" min</b>, then let the canner cool and depressurize naturally.");
+  }else{
+    const f=esc(foods[0].items.map(i=>i.name).join(" / "));
+    steps.push("Hot pack: cook the "+f+" until about two-thirds done, then drain excess fat (fat can climb the jar and break the seal).");
+    steps.push("Pack the hot "+f+" into "+loadN+" "+sizeWord+" jars, leaving "+hs+'" headspace.');
+    steps.push("Cover with boiling broth or water to "+hs+'" headspace. Add ½ tsp salt per pint / 1 tsp per quart if desired (optional — flavor only).');
+    steps.push("Remove air bubbles, wipe rims, seat lids fingertip-tight.");
+    steps.push("Process all "+loadN+" jars at "+psi+" PSI for <b>"+t+" min</b>, then let the canner cool and depressurize naturally.");
+  }
+
+  // handoff
+  let hand="";
+  if(res.b.frz.length) hand+='<div class="plan-hand"><span class="tag">Freeze / vacuum-seal:</span> '+res.b.frz.map(i=>esc(i.name)).join(", ")+' — build these as a sauce and freeze; stir in when you reheat.</div>';
+  if(res.b.frs.length) hand+='<div class="plan-hand"><span class="tag">Fresh at serving:</span> '+res.b.frs.map(i=>esc(i.name)).join(", ")+' — add at the stove or the table.</div>';
+
+  return '<div class="card"><h2>Canning plan</h2>'+
+    scaleBox+method+
+    '<div class="plan-lab">Staging — '+loadN+' '+sizeWord+'s, one load</div>'+
+    '<ol class="plan-steps">'+steps.map(s=>"<li>"+s+"</li>").join("")+'</ol>'+
+    hand+'</div>';
+}
+
+function resultsFor(size){
+  const res=router.stage(state.ings,{jarSize:size});
+  const revItems=res.b.rev;
+  // banner
+  let banner="";
+  if(revItems.length){
+    banner='<div class="banner warn"><div class="bh">'+iconMinus()+' Needs review: '+esc(revItems[0].name)+'</div>'+
+      'This component didn\'t match a tested process, so it can\'t be verified. Everything else still stages normally — resolve this one manually against the USDA guide before canning.</div>';
+  }else if(res.pctIn<100){
+    banner='<div class="banner ok"><div class="bh">'+iconCheck()+' '+res.pctIn+'% cans as-is</div>'+
+      'The in-jar portion maps to a tested process. The remaining components stage outside the jar (freeze or fresh) — this is component staging, not a recipe failure.</div>';
+  }
+  // verdict text
+  const vt={SINGLE:"Single tested food",SOUP:"Soup pathway",NONE:"Nothing to can",undefined:""}[res.verdict]||res.verdict;
+  // chips (only non-zero)
+  const chips=[['inj','In-jar',res.pctIn]];
+  if(res.pctFrz)chips.push(['frz','Freeze',res.pctFrz]);
+  if(res.pctFrs)chips.push(['frs','Fresh',res.pctFrs]);
+  if(res.pctRev)chips.push(['rev','Review',res.pctRev]);
+  const chipsH='<div class="chips">'+chips.map(c=>'<div class="chip '+c[0]+'"><b>'+c[2]+'%</b><span>'+c[1]+'</span></div>').join("")+'</div>';
+  // breakdown
+  const order=["inj","prep","frz","frs","rev","seas"];
+  let rows="";
+  order.forEach(pw=>res.b[pw].forEach(it=>{
+    rows+='<div class="brk-row"><span class="nm">'+esc(it.name)+'</span><span class="pill '+PILL[pw][0]+'">'+PILL[pw][1]+'</span></div>';
+  }));
+  return '<div class="card">'+banner+
+      '<h2 style="margin-bottom:6px">'+esc(document.getElementById("rname").value)+'</h2>'+
+      '<div style="font-size:12px;color:var(--muted);margin-bottom:14px">'+ (size==="pt"?"5-pint load":"4-quart load") +'</div>'+
+      '<div class="donutwrap">'+donutSVG(res.pctIn)+
+        '<div><p class="verdict-t">'+esc(vt)+'</p><p class="verdict-s">Goal: ≤15% outside-jar, weighted by volume. Seasonings and brine (PREP) are excluded from this math.</p></div></div>'+
+      chipsH+'</div>'+
+    '<div class="card"><h2>Ingredient breakdown</h2>'+rows+
+      '<p class="disc">Percentages are a volume estimate (units converted to cups) for planning, not a precise measure. This is a triage aid — it does not certify the recipe as safe. Confirm the exact process against the USDA Complete Guide or nchfp.uga.edu before canning.</p></div>';
+}
+function renderResults(){
+  const t=document.getElementById("tab-results");
+  if(!state.analyzed){t.innerHTML='<div class="card"><div class="empty">Add ingredients on the Analyze tab, then tap <b>Analyze recipe</b> to see the pathway breakdown here.</div></div>';return;}
+  if(state.loadSize==="both"){t.innerHTML=resultsFor("pt")+resultsFor("qt");}
+  else{t.innerHTML=resultsFor(state.loadSize);}
+}
+
+/* ============================ RENDER: prepare ============================ */
+function prepareFor(size){
+  const res=router.stage(state.ings,{jarSize:size});
+  const head='<div class="card" style="padding-bottom:15px"><h2 style="margin-bottom:4px">'+esc(document.getElementById("rname").value)+'</h2>'+
+    '<div style="font-size:12px;color:var(--muted)">'+(size==="pt"?"5-pint load":"4-quart load")+' · preparation &amp; process</div></div>';
+  const tail='<div class="card"><p class="disc" style="margin:0;border:none;padding:0">Triage aid only — confirm the exact time, pressure, and jar size against the USDA Complete Guide or nchfp.uga.edu before canning.</p></div>';
+  return head+procCard(res.jp,res.verdict,size)+planCard(res,size)+tail;
+}
+function renderPrepare(){
+  const t=document.getElementById("tab-prepare");
+  if(!state.analyzed){t.innerHTML='<div class="card"><div class="empty">Analyze a recipe first — the prep and process steps for each jar will appear here.</div></div>';return;}
+  if(state.loadSize==="both"){t.innerHTML=prepareFor("pt")+prepareFor("qt");}
+  else{t.innerHTML=prepareFor(state.loadSize);}
+}
+
+/* ============================ RENDER: reference ============================ */
+const FAQ=[
+  ["How much headspace do I leave for meat and mixed dishes?","1 inch for meat, poultry, and mixed vegetable dishes; poultry with bones uses 1¼ inch. Tomatoes use ½ inch. Check the specific food."],
+  ["Can I thicken a sauce before canning it?","No — flour and cornstarch block heat penetration and are unsafe to can. Clearjel is the one exception, and only inside a specific tested recipe. Otherwise thicken after opening, or freeze the sauce separately."],
+  ["Why can't I can pureed meat or vegetables?","USDA has no tested processing times for pureed/mashed low-acid foods at home — heat can't be guaranteed to reach the center. Can them in standard cut form, then puree at serving."],
+  ["What's the same-time rule?","Every jar in one load processes at the same time and pressure, governed by the single longest-processing ingredient in that load. No partial credit for faster components."],
+  ["Why is beef in broth not 'soup'?","A dense pack of one food covered with broth uses that food's own time (beef = 90 min quarts). The shorter soup time is only valid for the half-solids/half-liquid soup structure, so applying it to dense beef would under-process it."],
+  ["How do I handle a sauce that can't be canned?","Freeze it via the vacuum-seal pathway. Roux gravies, tomato sauces, and reductions freeze well. Cream and mayo-based sauces break when frozen — freeze a base version or add fresh at serving."],
+  ["Are wine or mushroom powder OK in the jar?","No. Wine isn't an approved jar liquid and powders add untested density. Simmer both into a sauce for the freeze pathway — the flavor still comes through when you combine at serving."],
+  ["Does vacuum sealing make something safer to freeze?","It improves quality (less freezer burn) but doesn't change safety. Freezing itself is what keeps the non-cannable components safe."]
+];
+function renderFAQ(q){
+  q=(q||"").toLowerCase();
+  const list=FAQ.filter(f=>!q||f[0].toLowerCase().includes(q)||f[1].toLowerCase().includes(q));
+  document.getElementById("faqlist").innerHTML= list.length?
+    list.map(f=>'<div class="faq"><q>'+esc(f[0])+'</q><p>'+esc(f[1])+'</p></div>').join(""):
+    '<div class="empty">No tips match that search.</div>';
+}
+
+/* ============================ helpers + wiring ============================ */
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+function iconMinus(){return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--red-ink)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>';}
+function iconCheck(){return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--sage-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-6"/></svg>';}
+
+function switchTab(name){
+  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("on"));
+  document.getElementById("tab-"+name).classList.add("on");
+  document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("on",b.dataset.tab===name));
+  document.querySelector("main").scrollTop=0;
+  if(name==="results")renderResults();
+  if(name==="prepare")renderPrepare();
+}
+document.querySelectorAll("#nav button").forEach(b=>b.addEventListener("click",()=>switchTab(b.dataset.tab)));
+document.getElementById("importseg").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll("#importseg button").forEach(x=>x.classList.remove("on"));b.classList.add("on");setImport(b.dataset.imp);}));
+document.getElementById("loadseg").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll("#loadseg button").forEach(x=>x.classList.remove("on"));b.classList.add("on");state.loadSize=b.dataset.load;}));
+document.getElementById("adding").addEventListener("click",()=>{state.ings.push({name:"",amount:1,unit:"cup"});renderIngs();});
+document.getElementById("analyzebtn").addEventListener("click",()=>{state.analyzed=true;switchTab("results");});
+document.getElementById("clearbtn").addEventListener("click",()=>{
+  document.getElementById("rname").value="";
+  state.ings=[];state.analyzed=false;
+  renderIngs();renderResults();renderPrepare();
+  switchTab("analyze");
+  document.querySelector("main").scrollTop=0;
+});
+document.getElementById("faqsearch").addEventListener("input",e=>renderFAQ(e.target.value));
+
+/* init */
+renderIngs();setImport("photo");renderFAQ("");renderResults();
+</script>
+</body>
+</html>
