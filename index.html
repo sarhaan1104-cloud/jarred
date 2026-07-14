@@ -550,23 +550,87 @@ async function doImportURL(){
     msg.textContent="Could not reach that URL. Try Clipboard, or paste ingredients manually.";
     showFallback(msg);return;
   }
-  var ldBlocks=html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)||[];
-  for(var li=0;li<ldBlocks.length;li++){
-    var inner=ldBlocks[li].replace(/<[^>]+>/g,"");
+  // Strategy 1: JSON-LD with @graph support
+  var r=extractJsonLdRecipe(html);
+  if(r){
+    if(r.name)document.getElementById("rname").value=r.name;
+    parseAndLoad(r.recipeIngredient.join("\n"),msg);return;
+  }
+  // Strategy 2: microdata + common recipe plugin selectors
+  var domLines=extractHtmlIngredients(html);
+  if(domLines.length){parseAndLoad(domLines.join("\n"),msg);return;}
+  // Strategy 3: find Ingredients heading, extract sibling list items
+  var section=extractIngredientSection(html);
+  if(section){parseAndLoad(section,msg);return;}
+  // Strategy 4: full page text (last resort)
+  var stripped=html.replace(/<[^>]+>/g," ").replace(/[ \t]+/g," ").replace(/ \n/g,"\n").replace(/\n /g,"\n");
+  parseAndLoad(stripped,msg);
+}
+function extractJsonLdRecipe(html){
+  var blocks=html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)||[];
+  for(var i=0;i<blocks.length;i++){
+    var inner=blocks[i].replace(/<[^>]+>/g,"");
     try{
       var ld=JSON.parse(inner);
       if(!Array.isArray(ld))ld=[ld];
-      var recipe=null;
-      for(var ri=0;ri<ld.length;ri++){if(ld[ri]&&ld[ri]["@type"]==="Recipe"){recipe=ld[ri];break;}}
-      if(recipe&&recipe.recipeIngredient&&recipe.recipeIngredient.length){
-        var text=recipe.recipeIngredient.join("\n");
-        if(recipe.name)document.getElementById("rname").value=recipe.name;
-        parseAndLoad(text,msg);return;
+      var flat=[];
+      for(var j=0;j<ld.length;j++){
+        if(ld[j]&&ld[j]["@graph"])flat=flat.concat(ld[j]["@graph"]);
+        else flat.push(ld[j]);
+      }
+      for(var k=0;k<flat.length;k++){
+        var item=flat[k];
+        if(!item)continue;
+        var t=item["@type"];
+        var isRecipe=(t==="Recipe")||(Array.isArray(t)&&t.indexOf("Recipe")>=0);
+        if(isRecipe&&item.recipeIngredient&&item.recipeIngredient.length)return item;
       }
     }catch(e){}
   }
-  var stripped=html.replace(/<[^>]+>/g," ").replace(/[ \t]+/g," ").replace(/ \n/g,"\n").replace(/\n /g,"\n");
-  parseAndLoad(stripped,msg);
+  return null;
+}
+function extractHtmlIngredients(html){
+  try{
+    var doc=(new DOMParser()).parseFromString(html,"text/html");
+    // microdata
+    var items=doc.querySelectorAll('[itemprop="recipeIngredient"],[itemprop="ingredients"]');
+    if(items.length>1)return Array.from(items).map(function(el){return el.textContent.trim();}).filter(Boolean);
+    // common recipe plugin selectors
+    var sels=[
+      '.wprm-recipe-ingredient-name','.wprm-recipe-ingredient',
+      '.tasty-recipe-ingredients li','.tasty-recipe-ingredient',
+      '.ERSIngredient','.ingredient-list li',
+      '.recipe-ingredients li','.recipe__ingredient',
+      '.recipe-ingred_txt li','[class*="ingredient"] li',
+      '[class*="Ingredient"] li','[class*="IngredientList"] li'
+    ];
+    for(var s=0;s<sels.length;s++){
+      var els=doc.querySelectorAll(sels[s]);
+      if(els.length>1)return Array.from(els).map(function(el){return el.textContent.trim();}).filter(Boolean);
+    }
+  }catch(e){}
+  return[];
+}
+function extractIngredientSection(html){
+  try{
+    var doc=(new DOMParser()).parseFromString(html,"text/html");
+    var headings=doc.querySelectorAll("h1,h2,h3,h4,h5,h6");
+    for(var i=0;i<headings.length;i++){
+      if(/ingredient/i.test(headings[i].textContent)){
+        var lines=[];
+        var el=headings[i].nextElementSibling;
+        while(el&&!["H1","H2","H3","H4","H5","H6"].includes(el.tagName)){
+          var lis=el.querySelectorAll("li");
+          if(lis.length){
+            lis.forEach(function(li){var t=li.textContent.trim();if(t)lines.push(t);});
+          }
+          el=el.nextElementSibling;
+        }
+        if(lines.length>1)return lines.join("\n");
+      }
+    }
+  }catch(e){}
+  return "";
 }
 async function doImportClipboard(){
   const msg=document.getElementById("impmsg");
