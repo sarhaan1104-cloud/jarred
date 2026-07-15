@@ -209,6 +209,26 @@
   @media (prefers-reduced-motion: reduce){
     *,*::before,*::after{animation-duration:.001s!important;animation-iteration-count:1!important;transition-duration:.001s!important;}
   }
+
+  /* header Save-to-PDF button */
+  .hbtn{margin-left:auto;display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.26);color:#fff;font-family:var(--sans);font-size:12.5px;font-weight:700;padding:8px 12px;border-radius:11px;cursor:pointer;transition:transform .12s ease,background .15s ease;flex:0 0 auto;}
+  .hbtn:hover{background:rgba(255,255,255,.24);}
+  .hbtn:active{transform:scale(.96);}
+  .hbtn svg{width:15px;height:15px;}
+
+  /* print / save-to-PDF */
+  #printarea{display:none;}
+  @media print{
+    @page{margin:14mm 12mm;}
+    body{background:#fff;display:block;color:#000;}
+    .shell{box-shadow:none;max-width:none;width:auto;min-height:0;border-radius:0;background:#fff;}
+    header,nav,main{display:none !important;}
+    #printarea{display:block !important;}
+    #printarea .card{break-inside:avoid;box-shadow:none;border:1px solid #ddd;margin-bottom:12px;}
+    #printarea .print-head h1{font-family:var(--serif);font-size:24px;margin:0 0 3px;}
+    #printarea .print-sub{font-size:11.5px;color:#666;margin-bottom:14px;}
+    .donut .ring,.tab.on{animation:none !important;}
+  }
 </style>
 </head>
 <body>
@@ -219,6 +239,7 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l3 3v3H6z"/><path d="M6 8h12v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1z"/><path d="M10 13h4"/></svg>
       </div>
       <h1>CAN U CAN IT!</h1>
+      <button class="hbtn" id="pdfbtn" aria-label="Save recipe to PDF"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>PDF</button>
     </div>
     <p class="sub">Pressure canning verifier · Nesco 9.5qt</p>
     <div class="ctx" id="ctxline"></div>
@@ -297,6 +318,7 @@
     <button data-tab="reference"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Reference</button>
     <button data-tab="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</button>
   </nav>
+  <div id="printarea"></div>
 </div>
 
 <script>
@@ -1104,6 +1126,27 @@ document.getElementById("clearbtn").addEventListener("click",()=>{
   document.querySelector("main").scrollTop=0;
 });
 document.getElementById("faqsearch").addEventListener("input",e=>renderFAQ(e.target.value));
+
+/* ---- Save to PDF (uses the browser print sheet → "Save as PDF") ---- */
+function buildPrintReport(){
+  const nm=esc((document.getElementById("rname").value||"Recipe").trim());
+  const sizes=state.loadSize==="both"?["pt","qt"]:[state.loadSize];
+  let h='<div class="print-head"><h1>'+nm+'</h1>'+
+    '<div class="print-sub">Pressure canning plan · CAN U CAN IT! · Nesco 9.5 qt · '+new Date().toLocaleDateString()+'</div></div>';
+  sizes.forEach(s=>{h+=resultsFor(s)+prepareFor(s);});
+  return h;
+}
+function savePDF(){
+  if(!state.ings.length){alert("Add or import a recipe first, then tap Save to PDF.");return;}
+  state.analyzed=true;
+  document.getElementById("printarea").innerHTML=buildPrintReport();
+  const orig=document.title;
+  document.title=(document.getElementById("rname").value||"Canning plan").trim();
+  const restore=()=>{document.title=orig;window.removeEventListener("afterprint",restore);};
+  window.addEventListener("afterprint",restore);
+  window.print();
+}
+document.getElementById("pdfbtn").addEventListener("click",savePDF);
 
 /* init */
 renderIngs();setImport("photo");renderFAQ("");renderResults();
