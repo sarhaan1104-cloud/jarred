@@ -1421,8 +1421,103 @@ function savePDF(){
 }
 document.getElementById("pdfbtn").addEventListener("click",savePDF);
 
+/* ============================ SELF-TESTS ============================
+   Regression net for the classifier, canning-recipe detection/extraction, name
+   parsing, and staging. Runs ONLY when the URL has #test (or ?test), so normal
+   users never see it. Open index.html#test in any browser — no server needed. */
+function runSelfTests(){
+  const T=[];
+  const eq=(name,got,exp)=>{const g=JSON.stringify(got),e=JSON.stringify(exp);T.push({name,got:g,exp:e,pass:g===e});};
+  const cls=n=>router.classify(n).pw;
+  const det=steps=>detectCanningRecipe(steps);
+  const mkName=(title,og)=>extractPageName('<html><head><title>'+title+'</title>'+(og?'<meta property="og:title" content="'+og+'">':'')+'</head><body></body></html>');
+
+  // --- classifier ---
+  eq("classify: beef chuck → in-jar", cls("beef chuck"), "inj");
+  eq("classify: ground beef → in-jar", cls("ground beef"), "inj");
+  eq("classify: chicken thighs → in-jar", cls("chicken thighs"), "inj");
+  eq("classify: beef broth → in-jar (liquid)", cls("beef broth"), "inj");
+  eq("classify: celery (vegetable) → fresh", cls("celery"), "frs");
+  eq("classify: celery seed → seasoning", cls("celery seed"), "seas");
+  eq("classify: cayenne → seasoning", cls("cayenne"), "seas");
+  eq("classify: mustard seed → seasoning", cls("mustard seed"), "seas");
+  eq("classify: yellow mustard → fresh", cls("yellow mustard"), "frs");
+  eq("classify: all-purpose flour → freeze", cls("all-purpose flour"), "frz");
+  eq("classify: heavy cream → fresh", cls("heavy cream"), "frs");
+  eq("classify: red wine → freeze", cls("red wine"), "frz");
+  eq("classify: mushroom powder → freeze", cls("mushroom powder"), "frz");
+  eq("classify: mushroom (whole) → in-jar", cls("mushroom"), "inj");
+  eq("classify: potato → in-jar", cls("potato"), "inj");
+  eq("classify: mashed potato is NOT in-jar", cls("mashed potato")!=="inj", true);
+  eq("classify: kimchi juice → prep/brine", cls("kimchi juice"), "prep");
+  eq("classify: salt → seasoning", cls("salt"), "seas");
+  eq("classify: unknown → review", cls("quibblefop"), "rev");
+
+  // --- canning-recipe detection ---
+  const d=det(["Pack hot jars leaving 1 inch headspace.","Process in a pressure canner: pints 75 minutes, quarts 90 minutes at 11 PSI. Wipe rims."]);
+  eq("detect: canning recipe → truthy", !!d, true);
+  eq("detect: pint time 75", d?d.timePt:null, 75);
+  eq("detect: quart time 90", d?d.timeQt:null, 90);
+  eq("detect: sandwich recipe → null", det(["Brown beef, toast the buns, serve."]), null);
+  eq("detect: single cue (pressure cooker) → null", det(["Cook in a pressure cooker 20 minutes."]), null);
+
+  // --- extraction edge cases ---
+  const m=det(["Pack jars, wipe rims, leaving 3 cm (1 inch) headspace.","Process in a pressure canner at 10 lbs: 75 minutes for half-litres; 90 minutes for litres."]);
+  eq("extract: metric litres → pint 75", m?m.timePt:null, 75);
+  eq("extract: metric litres → quart 90", m?m.timeQt:null, 90);
+  eq("extract: lbs → psi 10", m?m.psi:null, 10);
+  const h=det(["Wipe rims, pressure canner, leaving 1-1/4 inch headspace.","Process pints 75 minutes quarts 90 minutes."]);
+  eq("extract: mixed headspace 1-1/4 → 1.25", h?h.hs:null, 1.25);
+  const amb=det(["Pressure canner, wipe rims, 1 inch headspace.","Process 75 minutes; elsewhere 90 minutes."]);
+  eq("extract: ambiguous times stay null (pt)", amb?amb.timePt:"x", null);
+  eq("extract: ambiguous times stay null (qt)", amb?amb.timeQt:"x", null);
+
+  // --- recipe name parsing ---
+  eq("name: og:title wins", mkName("Recipe Keeper - Junk","Grandma Pot Roast"), "Grandma Pot Roast");
+  eq("name: brand prefix stripped, hyphen kept", mkName("Recipe Keeper - Smoke-Grilled Chicken",""), "Smoke-Grilled Chicken");
+  eq("name: brand suffix stripped", mkName("Braised Short Ribs Recipe - Food52",""), "Braised Short Ribs Recipe");
+  eq("name: pipe brand stripped", mkName("Best Chili | Allrecipes",""), "Best Chili");
+
+  // --- placement-from-instructions ---
+  eq("placement: stirred into pot → true", placementInJar("gochujang",["Stir in the gochujang and simmer."]), true);
+  eq("placement: garnish/serve → false", placementInJar("scallions",["Garnish with scallions before serving."]), false);
+
+  // --- volume conversion ---
+  eq("toCups: 1 cup → 1", toCups(1,"cup","water"), 1);
+  eq("toCups: 2 lb meat → 3.8", toCups(2,"lb","beef"), 3.8);
+
+  // --- staging / jar process ---
+  const single=router.stage([{name:"beef chuck",amount:2,unit:"lb"}],{jarSize:"qt",ft:0,gauge:"dial"});
+  eq("stage: single meat → SINGLE", single.verdict, "SINGLE");
+  eq("stage: single meat quart time 90", single.jp?single.jp.t:null, 90);
+  const soup=router.stage([{name:"beef",amount:1,unit:"lb"},{name:"carrots",amount:1,unit:"cup"},{name:"potato",amount:1,unit:"cup"}],{jarSize:"qt",ft:0,gauge:"dial"});
+  eq("stage: 3 solids → SOUP", soup.verdict, "SOUP");
+  eq("stage: soup quart time 75", soup.jp?soup.jp.t:null, 75);
+  const tom=router.stage([{name:"crushed tomato",amount:2,unit:"cup"}],{jarSize:"pt",ft:0,gauge:"dial"});
+  eq("stage: tomato sets acid flag", tom.jp?!!tom.jp.acid:false, true);
+  const alt=router.stage([{name:"beef",amount:1,unit:"lb"}],{jarSize:"qt",ft:5000,gauge:"dial"});
+  eq("stage: 5000 ft dial → 13 psi", alt.jp?alt.jp.psi:null, 13);
+
+  // --- render ---
+  const pass=T.filter(t=>t.pass).length, fail=T.length-pass;
+  const row=t=>'<tr style="background:'+(t.pass?"transparent":"#fdecea")+'"><td style="padding:5px 8px;border-bottom:1px solid #eee">'+
+    (t.pass?'<span style="color:#2f7d32">PASS</span>':'<span style="color:#c0392b;font-weight:700">FAIL</span>')+
+    '</td><td style="padding:5px 8px;border-bottom:1px solid #eee">'+t.name+
+    (t.pass?"":'<div style="font-size:11px;color:#c0392b">expected '+t.exp+", got "+t.got+"</div>")+'</td></tr>';
+  const sorted=T.slice().sort((a,b)=>a.pass-b.pass); // failures first
+  const ov=document.createElement("div");
+  ov.style.cssText="position:fixed;inset:0;z-index:9999;background:#fff;color:#222;font-family:system-ui,sans-serif;overflow:auto;padding:20px";
+  ov.innerHTML='<div style="display:flex;align-items:center;gap:14px;margin-bottom:12px">'+
+    '<h1 style="font-size:19px;margin:0">Self-tests</h1>'+
+    '<span style="font-size:15px;font-weight:800;color:'+(fail?"#c0392b":"#2f7d32")+'">'+pass+"/"+T.length+" passed"+(fail?" · "+fail+" FAILED":"")+'</span>'+
+    '<button onclick="this.closest(\'div\').parentNode.remove()" style="margin-left:auto;padding:6px 12px;border:1px solid #ccc;border-radius:8px;background:#f4f4f4;cursor:pointer">Close</button></div>'+
+    '<table style="border-collapse:collapse;width:100%;font-size:13px"><tbody>'+sorted.map(row).join("")+'</tbody></table>';
+  document.body.appendChild(ov);
+}
+
 /* init */
 loadSettings();reflectSettings();renderIngs();setImport("photo");renderFAQ("");renderResults();
+if(/(?:[?#&])test\b/i.test(location.search+location.hash)) runSelfTests();
 </script>
 </body>
 </html>
