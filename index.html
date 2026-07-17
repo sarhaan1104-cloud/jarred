@@ -630,19 +630,37 @@ function detectCanningRecipe(steps){
      .replace(/\b(?:litre|liter)s?\b/g," quartjar ")
      .replace(/\bquarts?\b/g," quartjar ")
      .replace(/\bpints?\b/g," pintjar ");
-  const findTime=tok=>{
-    let m=new RegExp(tok+"[^.;]{0,40}?(\\d+)\\s*(?:min|minute)").exec(t)
-        ||new RegExp("(\\d+)\\s*(?:min|minute)[^.;]{0,40}?"+tok).exec(t);
+  // parse a duration that may include HOURS — "1 hour 30 minutes" is 90, not 30.
+  // Missing this under-processes low-acid food (botulism risk), so hours win.
+  const durMin=seg=>{
+    if(!seg) return null;
+    let m=/(\d+(?:\.\d+)?)\s*(?:hours?|hrs?)\b(?:\s*(?:and\s+)?(\d+)\s*(?:minutes?|mins?|min)\b)?/i.exec(seg);
+    if(m) return Math.round(parseFloat(m[1])*60+(m[2]?+m[2]:0));
+    m=/(\d+)\s*(?:minutes?|mins?|min)\b/i.exec(seg);
     return m?+m[1]:null;
   };
+  const findTime=tok=>{
+    // window excludes ';' (clause separator) but allows '.' so decimals like
+    // "1.5 hours" survive; the 45-char cap keeps it from grabbing a distant time.
+    let a=new RegExp(tok+"([^;]{0,45})").exec(t); let v=a?durMin(a[1]):null;
+    if(v!=null) return v;
+    let b=new RegExp("([^;]{0,45})"+tok).exec(t); return b?durMin(b[1]):null;
+  };
   let timePt=findTime("pintjar"), timeQt=findTime("quartjar");
-  // Fallback ONLY when the recipe gives a single time: if there are two or more
-  // DIFFERENT minute values (e.g. 75 vs 90) we must not guess which size each is.
+  // Fallback ONLY when the recipe gives a single time: if two or more DIFFERENT
+  // values exist we must not guess which size each is. Only look in clauses that
+  // actually mention processing/canning, so a "boil 5 minutes" isn't mistaken.
   if(timePt==null&&timeQt==null){
-    const mins=(t.match(/(\d+)\s*(?:min|minute)/g)||[]).map(s=>parseInt(s,10));
-    const uniq=Array.from(new Set(mins));
+    const vals=[];
+    t.split(/[.;]/).forEach(s=>{if(/process|pressure|can\b|canner/i.test(s)){const d=durMin(s);if(d!=null)vals.push(d);}});
+    const uniq=Array.from(new Set(vals));
     if(uniq.length===1){timePt=uniq[0];timeQt=uniq[0];}
   }
+  // SAFETY FLOOR: a pressure-canning process under ~20 min is almost certainly a
+  // mis-read cook/boil time. Never auto-fill a dangerously low number — blank it
+  // so the banner asks the user to enter the real time from the recipe.
+  if(timePt!=null&&timePt<20) timePt=null;
+  if(timeQt!=null&&timeQt<20) timeQt=null;
   let psi=null;const pm=/(\d+)\s*(?:psi|pounds?|lbs?)\b/.exec(t);if(pm)psi=+pm[1];
   // headspace: handle mixed numbers ("1-1/4 inch", "1 1/2 inch"), bare fractions
   // ("1/2", "½"), and plain/decimal ("1 inch", "(1 inch)").
@@ -1525,9 +1543,18 @@ function runSelfTests(){
   eq("extract: lbs → psi 10", m?m.psi:null, 10);
   const h=det(["Wipe rims, pressure canner, leaving 1-1/4 inch headspace.","Process pints 75 minutes quarts 90 minutes."]);
   eq("extract: mixed headspace 1-1/4 → 1.25", h?h.hs:null, 1.25);
-  const amb=det(["Pressure canner, wipe rims, 1 inch headspace.","Process 75 minutes; elsewhere 90 minutes."]);
-  eq("extract: ambiguous times stay null (pt)", amb?amb.timePt:"x", null);
-  eq("extract: ambiguous times stay null (qt)", amb?amb.timeQt:"x", null);
+  const amb=det(["Pressure canner, wipe rims, 1 inch headspace.","Process for 75 minutes.","Then process again for 90 minutes."]);
+  eq("extract: two different process times stay null (pt)", amb?amb.timePt:"x", null);
+  eq("extract: two different process times stay null (qt)", amb?amb.timeQt:"x", null);
+  // hours must not be dropped ("1 hour 30 minutes" = 90, not 30) — botulism guard
+  var hr=det(["Pressure canner, wipe rims, 1 inch headspace.","Process quart jars for 1 hour 30 minutes and pint jars for 1 hour 15 minutes at 11 PSI."]);
+  eq("extract: '1 hour 15 minutes' pint → 75", hr?hr.timePt:null, 75);
+  eq("extract: '1 hour 30 minutes' quart → 90", hr?hr.timeQt:null, 90);
+  var hrOnly=det(["Pressure canner, wipe rims, 1 inch headspace.","Process pints for 1 hour and quarts for 1.5 hours."]);
+  eq("extract: '1 hour' → 60", hrOnly?hrOnly.timePt:null, 60);
+  eq("extract: '1.5 hours' → 90", hrOnly?hrOnly.timeQt:null, 90);
+  var low=det(["Pressure canner, wipe rims, 1 inch headspace.","Process pint jars for 15 minutes and quart jars for 30 minutes."]);
+  eq("extract: sub-20 pint time rejected (safety floor)", low?low.timePt:"x", null);
 
   // --- recipe name parsing ---
   eq("name: og:title wins", mkName("Recipe Keeper - Junk","Grandma Pot Roast"), "Grandma Pot Roast");
