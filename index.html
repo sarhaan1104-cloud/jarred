@@ -219,14 +219,28 @@
   /* print / save-to-PDF */
   #printarea{display:none;}
   @media print{
-    @page{margin:14mm 12mm;}
-    body{background:#fff;display:block;color:#000;}
-    .shell{box-shadow:none;max-width:none;width:auto;min-height:0;border-radius:0;background:#fff;}
+    @page{margin:12mm 12mm;}
+    html,body{background:#fff;}
+    body{display:block;color:#000;}
+    /* critical: the phone-frame shell is height:100vh/overflow:hidden on screen,
+       which clips the printout to one page. Let it grow and overflow in print. */
+    .shell{box-shadow:none;max-width:none;width:auto;min-height:0;height:auto;overflow:visible;border-radius:0;background:#fff;}
     header,nav,main{display:none !important;}
-    #printarea{display:block !important;}
-    #printarea .card{break-inside:avoid;box-shadow:none;border:1px solid #ddd;margin-bottom:12px;}
-    #printarea .print-head h1{font-family:var(--serif);font-size:24px;margin:0 0 3px;}
-    #printarea .print-sub{font-size:11.5px;color:#666;margin-bottom:14px;}
+    #printarea{display:block !important;font-size:12px;line-height:1.45;color:#000;}
+    #printarea .print-head{margin-bottom:10px;}
+    #printarea .print-head h1{font-family:var(--serif);font-size:23px;margin:0 0 2px;}
+    #printarea .print-sub{font-size:11px;color:#666;margin-bottom:6px;}
+    #printarea .print-section-lab{font-family:var(--sans);font-size:12.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#7a3b23;border-bottom:2px solid #e0d4bf;padding-bottom:3px;margin:0 0 10px;break-after:avoid;}
+    #printarea .card{break-inside:avoid;box-shadow:none;border:1px solid #ddd;border-radius:8px;margin:0 0 10px;padding:11px 13px;background:#fff;}
+    #printarea .card h2{font-size:14.5px;margin:0 0 7px;}
+    #printarea .plan-lab{break-after:avoid;}
+    #printarea .plan-steps li{margin-bottom:4px;}
+    #printarea .donutwrap{break-inside:avoid;}
+    #printarea .print-ings{width:100%;border-collapse:collapse;font-size:12px;}
+    #printarea .print-ings td{padding:3px 2px;border-bottom:1px solid #eee;vertical-align:top;}
+    #printarea .print-ings td.amt{text-align:right;white-space:nowrap;color:#444;}
+    #printarea .print-ctx{font-size:11px;color:#666;margin:9px 0 0;}
+    #printarea .page-break{break-before:page;}
     .donut .ring,.tab.on{animation:none !important;}
   }
 </style>
@@ -1328,12 +1342,30 @@ document.getElementById("clearbtn").addEventListener("click",()=>{
 document.getElementById("faqsearch").addEventListener("input",e=>renderFAQ(e.target.value));
 
 /* ---- Save to PDF (uses the browser print sheet → "Save as PDF") ---- */
+function recipeCardPrint(){
+  const rows=state.ings.map(i=>{
+    const amt=(i.amount!=null&&i.amount!=="")?esc(i.amount)+" "+esc(i.unit):"";
+    return '<tr><td>'+esc(i.name)+'</td><td class="amt">'+amt+'</td></tr>';
+  }).join("");
+  const load=state.loadSize==="both"?"pints & quarts":state.loadSize==="pt"?"pints":"quarts";
+  const ctx=(state.gauge==="weighted"?"Weighted":"Dial")+" gauge · "+(state.altFt||0)+" ft elevation · "+load;
+  return '<div class="card"><h2>Ingredients</h2>'+
+    '<table class="print-ings"><tbody>'+rows+'</tbody></table>'+
+    '<p class="print-ctx">'+ctx+'</p></div>';
+}
 function buildPrintReport(){
   const nm=esc((document.getElementById("rname").value||"Recipe").trim());
   const sizes=state.loadSize==="both"?["pt","qt"]:[state.loadSize];
   let h='<div class="print-head"><h1>'+nm+'</h1>'+
     '<div class="print-sub">Pressure canning plan · CAN U CAN IT! · Nesco 9.5 qt · '+new Date().toLocaleDateString()+'</div></div>';
-  sizes.forEach(s=>{h+=resultsFor(s)+prepareFor(s);});
+  // 1 · Recipe
+  h+='<div class="print-section-lab">Recipe</div>'+recipeCardPrint();
+  // 2 · Results
+  h+='<div class="print-section-lab">Results</div>';
+  sizes.forEach(s=>{h+=resultsFor(s);});
+  // 3 · Preparing — start on a fresh page
+  h+='<div class="print-section-lab page-break">Preparing &amp; process</div>';
+  sizes.forEach(s=>{h+=prepareFor(s);});
   return h;
 }
 function savePDF(){
