@@ -633,6 +633,28 @@ function stageFor(size){
 // Let the user override auto-detected canning-recipe mode and see the normal
 // ingredient breakdown instead (or switch back).
 function toggleCanMode(){state.forceTriage=!state.forceTriage;renderResults();renderPrepare();}
+// Let the user correct or fill in the author's process values (times/headspace)
+// when the importer misread them or the page didn't state them.
+function setAuthorField(f,v){
+  if(!state.canRecipe) return;
+  const n=parseFloat(v);
+  state.canRecipe[f]=(v===""||isNaN(n))?null:n;
+  renderResults();renderPrepare();
+}
+function authorProcessEditor(){
+  if(!state.canRecipe||state.forceTriage) return "";
+  const cr=state.canRecipe;
+  const fld=(label,field,val,unit)=>
+    '<label style="display:inline-flex;align-items:center;gap:6px;margin:0 14px 8px 0;font-size:12.5px;color:#5c574c">'+label+
+    ' <input type="number" step="0.25" min="0" value="'+(val!=null?val:"")+'" placeholder="—" '+
+    'onchange="setAuthorField(\''+field+'\',this.value)" '+
+    'style="width:66px;padding:5px 7px;border:1px solid var(--line);border-radius:8px;font-family:var(--sans);font-size:12.5px"> '+unit+'</label>';
+  const missing=(cr.timePt==null||cr.timeQt==null||cr.hs==null);
+  return '<div class="card"><h2>Process values'+(missing?' — fill in the blanks':'')+'</h2>'+
+    '<p class="hint" style="margin:0 0 10px">Read from the recipe. Correct anything the importer misread, or fill any blank from the original recipe — the plan and PDF update to match.</p>'+
+    fld('Pints','timePt',cr.timePt,'min')+fld('Quarts','timeQt',cr.timeQt,'min')+fld('Headspace','hs',cr.hs,'in')+
+    '</div>';
+}
 
 /* ============================ APP STATE ============================ */
 const router=new StagingRouter(DATA);
@@ -1238,8 +1260,8 @@ function resultsFor(size){
 function renderResults(){
   const t=document.getElementById("tab-results");
   if(!state.analyzed){t.innerHTML='<div class="card"><div class="empty">'+iconEmpty()+'Add ingredients on the Analyze tab, then tap <b>Analyze recipe</b> to see the pathway breakdown here.</div></div>';return;}
-  if(state.loadSize==="both"){t.innerHTML=resultsFor("pt")+resultsFor("qt");}
-  else{t.innerHTML=resultsFor(state.loadSize);}
+  const body=state.loadSize==="both"?(resultsFor("pt")+resultsFor("qt")):resultsFor(state.loadSize);
+  t.innerHTML=body+authorProcessEditor();
 }
 
 /* ============================ RENDER: prepare ============================ */
