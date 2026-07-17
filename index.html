@@ -663,7 +663,7 @@ function authorRes(size){
   // the app's generic tomato-acidification rule (it can contradict a valid
   // pressure-canning recipe that gets its acid from the ingredients themselves).
   const jp=(t!=null)?{t,psi,hs:cr.hs!=null?cr.hs:1,basis:"Recipe author's tested process",author:true,acid:false}:null;
-  return {b:{inj,frz:[],frs:[],prep:[],rev:[],seas:[]},jp,verdict:"AUTHOR",author:true,cr,
+  return {b:{inj,frz:[],frs:[],prep:[],rev:[],seas:[],serve:[]},jp,verdict:"AUTHOR",author:true,cr,
     warnings:[],pctIn:100,pctFrz:0,pctFrs:0,pctRev:0};
 }
 function stageFor(size){
@@ -1167,7 +1167,7 @@ function sortSteps(res){
   if(!raw.length) return {jarSteps,outSteps};
   // build an ingredient -> pathway index from the staged result
   const idx=[];
-  ["inj","frz","frs","prep","rev","seas","serve"].forEach(pw=>res.b[pw].forEach(it=>{
+  ["inj","frz","frs","prep","rev","seas","serve"].forEach(pw=>(res.b[pw]||[]).forEach(it=>{
     const nm=String(it.name).toLowerCase();
     idx.push({pw:pw,name:nm,toks:nm.split(/[^a-z]+/).filter(w=>w.length>=4)});
   }));
@@ -1230,7 +1230,7 @@ function assemblyCard(res,size){
       : solidNames+' packed and covered with '+liqNames+'. Every jar is the same.'));
   if(res.b.frz.length) map+=mapRow('frz',frzSVG,'Freezer',
     res.b.frz.map(i=>esc(i.name)).join(", ")+' — portion into freezer bags or vacuum-seal; label &amp; date.');
-  const freshList=[...res.b.frs,...res.b.serve];
+  const freshList=[...(res.b.frs||[]),...(res.b.serve||[])];
   if(freshList.length) map+=mapRow('frs',frsSVG,'Fresh / serving — fridge / pantry',
     freshList.map(i=>esc(i.name)).join(", ")+' — buy or make these the day you serve.');
   // rebuild
@@ -1304,7 +1304,7 @@ function resultsFor(size){
   // breakdown
   const order=["inj","prep","frz","frs","rev","seas","serve"];
   let rows="";
-  order.forEach(pw=>res.b[pw].forEach(it=>{
+  order.forEach(pw=>(res.b[pw]||[]).forEach(it=>{
     const nm=esc(it.name)+(it.auto?' <span style="font-size:11px;color:var(--muted);font-style:italic">— placement from recipe steps; confirm it\'s only a flavoring</span>':"");
     const pill=it.auto?"SEASONING?":PILL[pw][1];
     rows+='<div class="brk-row"><span class="nm">'+nm+'</span><span class="pill '+PILL[pw][0]+'">'+pill+'</span></div>';
@@ -1564,6 +1564,14 @@ function runSelfTests(){
   eq("serve: rice moved to serve bucket", wServe.b.serve.map(i=>i.name), ["Brown or white rice sliced green onions"]);
   var nServe=router.stage([{name:"boneless skinless chicken breasts",amount:1.5,unit:"lb"},{name:"soy sauce",amount:3,unit:"tbsp"},{name:"Brown or white rice sliced green onions",amount:1,unit:"each"}],{jarSize:"qt",ft:0,gauge:"dial",steps:[]});
   eq("serve: excluding serving raises in-jar %", wServe.pctIn>nServe.pctIn, true);
+  // author-mode result must carry every bucket the renderers iterate (regression:
+  // a missing serve bucket blanked Results/Preparing for detected canning recipes)
+  var _cr=state.canRecipe,_ings=state.ings;
+  state.canRecipe={isCanning:true,timePt:75,timeQt:90,psi:11,hs:1};
+  state.ings=[{name:"beef",amount:2,unit:"lb"}];
+  var au=authorRes("qt");
+  state.canRecipe=_cr;state.ings=_ings;
+  eq("author result has all render buckets", ["inj","frz","frs","prep","rev","seas","serve"].every(k=>Array.isArray(au.b[k])), true);
 
   // --- render ---
   const pass=T.filter(t=>t.pass).length, fail=T.length-pass;
