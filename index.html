@@ -590,8 +590,12 @@ function detectCanningRecipe(steps){
     if(uniq.length===1){timePt=uniq[0];timeQt=uniq[0];}
   }
   let psi=null;const pm=/(\d+)\s*(?:psi|pounds?|lbs?)\b/.exec(t);if(pm)psi=+pm[1];
-  let hs=null;const hm=/(\d+(?:\.\d+)?|½|¼|¾|⅓|⅔|\d\/\d)\s*-?\s*(?:inch|inches|in\b|")\)?\s*(?:of\s*)?head/.exec(t);
-  if(hm)hs=_numFrac(hm[1]);
+  // headspace: handle mixed numbers ("1-1/4 inch", "1 1/2 inch"), bare fractions
+  // ("1/2", "½"), and plain/decimal ("1 inch", "(1 inch)").
+  let hs=null;
+  let hm=/(?:(\d+)\s*[-\s]\s*)?(\d\/\d|½|¼|¾|⅓|⅔)\s*-?\s*(?:inch|inches|in\b|")\)?\s*(?:of\s*)?head/.exec(t);
+  if(hm){hs=(hm[1]?+hm[1]:0)+_numFrac(hm[2]);}
+  else{const dm=/(\d+(?:\.\d+)?)\s*-?\s*(?:inch|inches|in\b|")\)?\s*(?:of\s*)?head/.exec(t);if(dm)hs=parseFloat(dm[1]);}
   return {isCanning:true,count,signals,timePt,timeQt,psi,hs};
 }
 /* Build a result object shaped like router.stage() output, but in author-tested
