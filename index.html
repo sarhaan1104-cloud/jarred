@@ -544,6 +544,69 @@ function placementInJar(name,steps){
   return false;
 }
 
+/* ---- Is the imported page ITSELF a tested canning recipe? ----
+   Canning recipes announce themselves the same way on every source: they talk
+   about headspace, a pressure/water-bath canner, a process time in minutes, a
+   PSI / pounds of pressure, venting, and sealing the jars. If two or more of
+   those cues appear, we treat the whole recipe as author-tested rather than
+   dismantling it ingredient-by-ingredient. We then pull the author's stated
+   time / pressure / headspace straight out of the text. */
+const _FRAC={"½":.5,"¼":.25,"¾":.75,"⅓":1/3,"⅔":2/3};
+function _numFrac(s){s=(s||"").trim();if(_FRAC[s]!=null)return _FRAC[s];
+  if(/^\d+\/\d+$/.test(s)){const p=s.split("/");return +p[0]/+p[1];}
+  const v=parseFloat(s);return isNaN(v)?null:v;}
+function detectCanningRecipe(steps){
+  const text=(steps||[]).join("  ").toLowerCase();
+  if(!text) return null;
+  const signals={
+    headspace:/head\s?space/.test(text),
+    pressure:/pressure canner|pressure-?can|water bath|water-?bath|boiling water canner/.test(text),
+    process:/process(?:ing)?\b[^.]{0,40}?\b\d+\s*(?:min|minute)/.test(text)||/\bprocess(?:ed|ing)?\b[^.]{0,40}\bminutes\b/.test(text),
+    psi:/\d+\s*(?:psi|pounds?(?:\s*(?:of\s*)?pressure)?|lbs?\.?\s*pressure)/.test(text),
+    vent:/vent(?:ing)?\b[^.]{0,30}?(?:\d+\s*min|steam|canner|10 min)/.test(text),
+    seal:/wipe (?:the )?rim|fingertip[ -]?tight|hand[- ]?tighten|lids and rings|hot jars|jar lifter/.test(text)
+  };
+  const count=Object.keys(signals).filter(k=>signals[k]).length;
+  if(count<2) return null;
+  // extract the author's stated process
+  const findTime=word=>{
+    let m=new RegExp(word+"[a-z]*\\b[^.;]{0,30}?(\\d+)\\s*(?:min|minute)","i").exec(text)
+        ||new RegExp("(\\d+)\\s*(?:min|minute)[^.;]{0,30}?"+word,"i").exec(text);
+    return m?+m[1]:null;
+  };
+  let timePt=findTime("pint"), timeQt=findTime("quart");
+  // fallback: a single unqualified process time applies to whatever size is mentioned
+  if(timePt==null&&timeQt==null){
+    const m=/process[^.;]{0,40}?(\d+)\s*(?:min|minute)/i.exec(text);
+    if(m){timePt=+m[1];timeQt=+m[1];}
+  }
+  let psi=null;const pm=/(\d+)\s*(?:psi|pounds?)/i.exec(text);if(pm)psi=+pm[1];
+  let hs=null;const hm=/(\d+(?:\.\d+)?|½|¼|¾|⅓|⅔|\d\/\d)\s*-?\s*(?:inch|in\b|")\s*(?:of\s*)?head/i.exec(text);
+  if(hm)hs=_numFrac(hm[1]);
+  return {isCanning:true,count,signals,timePt,timeQt,psi,hs};
+}
+/* Build a result object shaped like router.stage() output, but in author-tested
+   mode: every ingredient is in the jar and the process comes from the recipe. */
+function authorRes(size){
+  const cr=state.canRecipe;
+  const inj=state.ings.map(ing=>({name:ing.name,cups:toCups(ing.amount,ing.unit,ing.name),pw:"inj"}));
+  const t=size==="pt"?cr.timePt:cr.timeQt;
+  const psi=router._psi(state.gauge,state.altFt||0);
+  // In author mode the recipe's own steps govern acid/additives — don't inject
+  // the app's generic tomato-acidification rule (it can contradict a valid
+  // pressure-canning recipe that gets its acid from the ingredients themselves).
+  const jp=(t!=null)?{t,psi,hs:cr.hs!=null?cr.hs:1,basis:"Recipe author's tested process",author:true,acid:false}:null;
+  return {b:{inj,frz:[],frs:[],prep:[],rev:[],seas:[]},jp,verdict:"AUTHOR",author:true,cr,
+    warnings:[],pctIn:100,pctFrz:0,pctFrs:0,pctRev:0};
+}
+function stageFor(size){
+  return (state.canRecipe&&!state.forceTriage) ? authorRes(size)
+    : router.stage(state.ings,{jarSize:size,ft:state.altFt,gauge:state.gauge,steps:state.recipeSteps});
+}
+// Let the user override auto-detected canning-recipe mode and see the normal
+// ingredient breakdown instead (or switch back).
+function toggleCanMode(){state.forceTriage=!state.forceTriage;renderResults();renderPrepare();}
+
 /* ============================ APP STATE ============================ */
 const router=new StagingRouter(DATA);
 const state={
@@ -551,6 +614,8 @@ const state={
   altFt:0,             // user's elevation — drives the PSI adjustment
   gauge:"dial",        // "dial" | "weighted"
   recipeSteps:[],
+  canRecipe:null,      // set when an imported page is itself a tested canning recipe
+  forceTriage:false,   // user override: show ingredient breakdown even for a canning recipe
   ings:[]
 };
 const UNITS=["cup","tbsp","tsp","oz","lb","each"];
@@ -637,7 +702,7 @@ async function doImportURL(){
   const url=(urlEl?urlEl.value:"").trim();
   if(!url){msg.className="impmsg info";msg.textContent="Paste a recipe URL above first.";return;}
   msg.className="impmsg info";msg.textContent="Fetching recipe...";
-  state.recipeSteps=[];
+  state.recipeSteps=[];state.canRecipe=null;state.forceTriage=false;
   const proxies=[
     function(u){return "https://api.allorigins.win/get?url="+encodeURIComponent(u);},
     function(u){return "https://corsproxy.io/?"+encodeURIComponent(u);}
@@ -670,12 +735,14 @@ async function doImportURL(){
   if(r){
     if(r.name)document.getElementById("rname").value=r.name;
     state.recipeSteps=normInstructions(r.recipeInstructions);
+    state.canRecipe=detectCanningRecipe(state.recipeSteps);
     parseAndLoad(r.recipeIngredient.join("\n"),msg);return;
   }
   // For strategies 2-4, try to pull the page/recipe name + instructions
   var pn=extractPageName(html);
   if(pn)document.getElementById("rname").value=pn;
   state.recipeSteps=extractInstructionSection(html);
+  state.canRecipe=detectCanningRecipe(state.recipeSteps);
   // Strategy 2: microdata + common recipe plugin selectors
   var domLines=extractHtmlIngredients(html);
   if(domLines.length){parseAndLoad(domLines.join("\n"),msg);return;}
@@ -822,7 +889,7 @@ function showFallback(msg){
   fb.innerHTML="<p class='hint' style='margin:12px 0 8px'>Or paste ingredients here:</p>"+
     "<textarea class='paste' id='pastebox' style='margin-bottom:8px'></textarea>"+
     "<button class='btn block' id='manualbtn'>Add ingredients</button>";
-  document.getElementById("manualbtn").addEventListener("click",function(){parseAndLoad(document.getElementById("pastebox").value,msg);});
+  document.getElementById("manualbtn").addEventListener("click",function(){state.canRecipe=null;state.forceTriage=false;parseAndLoad(document.getElementById("pastebox").value,msg);});
 }
 function parseAndLoad(text,msg){
   const parsed=parseRecipeText(text);
@@ -849,9 +916,13 @@ function donutSVG(pct){
     '<text x="59" y="74" text-anchor="middle" font-size="11" fill="var(--muted)" letter-spacing="1">IN-JAR</text></svg>';
 }
 function procCard(jp,verdict,size){
-  if(!jp) return '<div class="card"><h2>Jar process</h2><p class="hint" style="margin:0">Nothing maps to a tested in-jar process. Can the components separately, or route them to freeze / fresh.</p></div>';
+  if(!jp){
+    if(verdict==="AUTHOR") return '<div class="card"><h2>Jar process</h2><p class="hint" style="margin:0">This is a canning recipe, but the process time couldn\'t be read from the page for this jar size. Open the original recipe and use its stated time, pressure and headspace.</p></div>';
+    return '<div class="card"><h2>Jar process</h2><p class="hint" style="margin:0">Nothing maps to a tested in-jar process. Can the components separately, or route them to freeze / fresh.</p></div>';
+  }
   const label=size==="pt"?"pints":"quarts";
   let h='<div class="card"><h2>Jar process</h2>'+
+    (jp.author?'<p class="hint" style="margin:0 0 10px">Read from the recipe author — <b>not</b> derived by this tool. Verify against a USDA-tested source.</p>':'')+
     '<div class="proc-line"><span class="k">Basis</span><span class="v">'+esc(jp.basis)+'</span></div>'+
     '<div class="proc-line"><span class="k">Process ('+label+')</span><span class="v">'+jp.t+' min</span></div>'+
     '<div class="proc-line"><span class="k">Pressure</span><span class="v">'+jp.psi+' PSI ('+(state.gauge==="weighted"?"weighted":"dial")+' gauge'+(state.altFt>0?", "+state.altFt+" ft":"")+')</span></div>'+
@@ -868,13 +939,18 @@ const fmtCups=c=>{c=Math.round(c*10)/10;return c+(c===1?" cup":" cups");};
 const shortFood=n=>n.split("(")[0].trim().toLowerCase();
 
 function planCard(res,size){
+  const author=!!(res.jp&&res.jp.author);
   const solids=res.b.inj.filter(i=>!(i.proc&&i.proc.liquid));
-  if(!solids.length||!res.jp) return "";
+  if(!res.jp||(!author&&!solids.length)) return "";
   const sizeWord=size==="pt"?"pint":"quart";
   const loadN=LOADN[size], psi=res.jp.psi, t=res.jp.t, hs=res.jp.hs;
+  const jarWord=loadN+" "+sizeWord+" jar"+(loadN===1?"":"s");
 
+  let scaleBox="", method, foods=[];
+  if(author){
+    method='<div class="plan-method"><b>Already a canning recipe.</b> Make the recipe exactly as its own instructions say, then pack and process with the author\'s time, pressure and headspace. This tool did not derive these numbers — confirm them against a USDA-tested source before canning.</div>';
+  }else{
   // distinct tested foods in the jar
-  const foods=[];
   solids.forEach(s=>{let f=foods.find(x=>x.name===s.proc.name);
     if(!f){f={name:s.proc.name,proc:s.proc,items:[]};foods.push(f);}f.items.push(s);});
 
@@ -886,28 +962,28 @@ function planCard(res,size){
   const scaleR=Math.round(scale*100)/100;
   const dir=scaleR>1?"scale up":scaleR<1?"scale down":"as written";
   const scaledCore=solids.map(s=>esc(s.name)+" → "+fmtCups(s.cups*scale)).join(" · ");
-  const scaleBox='<div class="scale-box">To fill a full <b>'+loadN+'-'+sizeWord+'</b> load you need ≈ '+fmtCups(targetSolid)+
+  scaleBox='<div class="scale-box">To fill a full <b>'+loadN+'-'+sizeWord+'</b> load you need ≈ '+fmtCups(targetSolid)+
     ' of prepped core. Your recipe yields ≈ '+fmtCups(curSolid)+' → multiply every ingredient <b>×'+scaleR+'</b> ('+dir+').'+
     '<div style="margin-top:8px;font-size:12.5px;opacity:.85">Scaled core: '+scaledCore+'</div></div>';
+  }
 
-  // method text
-  let method;
-  if(foods.length===1){
-    method='<div class="plan-method"><b>1-jar method</b> — single-component pack. The cannable core is one tested food ('+
-      shortFood(foods[0].name)+'), so every jar in the load is the same thing. Everything else is staged outside the jar.</div>';
-  }else{
-    const longest=Math.max(...foods.map(f=>f.proc.time[size]||0));
-    method='<div class="plan-method"><b>Two ways to jar this — pick one:</b><br><br>'+
-      '<b>A · One-jar (soup):</b> combine all '+foods.length+' foods in every jar, half solids / half liquid, '+t+' min. Simplest; every jar is the same blend.<br><br>'+
-      '<b>B · Component jars:</b> give each food its own jars — '+
-      foods.map(f=>shortFood(f.name)+' ('+ (f.proc.time[size]==null?"other size":f.proc.time[size]+" min") +')').join(", ")+
-      '. More prep, but one session stocks several different meals. Run in the same load and all jars hold at the longest time ('+longest+' min).<br><br>'+
-      'Steps below follow <b>method A</b>.</div>';
+  // method text (whitelist mode only; author method is set above)
+  if(!author){
+    if(foods.length===1){
+      method='<div class="plan-method"><b>1-jar method</b> — single-component pack. The cannable core is one tested food ('+
+        shortFood(foods[0].name)+'), so every jar in the load is the same thing. Everything else is staged outside the jar.</div>';
+    }else{
+      const longest=Math.max(...foods.map(f=>f.proc.time[size]||0));
+      method='<div class="plan-method"><b>Two ways to jar this — pick one:</b><br><br>'+
+        '<b>A · One-jar (soup):</b> combine all '+foods.length+' foods in every jar, half solids / half liquid, '+t+' min. Simplest; every jar is the same blend.<br><br>'+
+        '<b>B · Component jars:</b> give each food its own jars — '+
+        foods.map(f=>shortFood(f.name)+' ('+ (f.proc.time[size]==null?"other size":f.proc.time[size]+" min") +')').join(", ")+
+        '. More prep, but one session stocks several different meals. Run in the same load and all jars hold at the longest time ('+longest+' min).<br><br>'+
+        'Steps below follow <b>method A</b>.</div>';
+    }
   }
 
   // ---- detailed, phased steps ----
-  const jarWord=loadN+" "+sizeWord+" jar"+(loadN===1?"":"s");
-
   // Set up
   const setup=[
     "Wash the "+jarWord+" in hot soapy water and rinse well. Keep them hot — sitting in the canner's water or a sink of hot water — so they don't crack when the hot food goes in. Wash the screw bands and set out "+loadN+" new flat lids; just wipe them clean (modern lids don't need boiling).",
@@ -919,7 +995,9 @@ function planCard(res,size){
   if(res.b.prep.length){
     prep.push("Brine step: soak "+res.b.prep.map(i=>esc(i.name)).join(", ")+" for the recipe's marinating time, then <b>drain and discard the brine</b> — it flavors the food but never goes in the jar.");
   }
-  if(res.verdict==="SOUP"){
+  if(author){
+    prep.push("Make the recipe through all of its own cooking steps exactly as written. Just before packing, bring the finished mixture back to a boil so it goes into the jars piping hot.");
+  }else if(res.verdict==="SOUP"){
     prep.push("Prep each solid by its own hot-pack method: pre-cook meat until about two-thirds done, blanch or par-cook firm vegetables, and fully rehydrate any dried beans (soak, then boil ~30 min). Everything goes into the jar hot.");
     prep.push("Combine the solids in a large pot, cover with boiling broth, water, or acidified tomatoes, and boil for 5 minutes. <b>Do not thicken</b> — no flour, cornstarch, or Clearjel; they block heat from reaching the jar's center.");
   }else{
@@ -933,7 +1011,9 @@ function planCard(res,size){
   if(res.jp.acid){
     pack.push("Acidify first: put <b>2 tbsp bottled lemon juice or ½ tsp citric acid</b> into each quart jar (1 tbsp / ¼ tsp per pint) before any food goes in. Required whenever tomatoes are in the jar — fresh lemon juice is not a substitute.");
   }
-  if(res.verdict==="SOUP"){
+  if(author){
+    pack.push("Ladle the hot mixture into the "+jarWord+", leaving "+hs+'" headspace (the gap between food and rim). Follow the recipe\'s own headspace if it differs.');
+  }else if(res.verdict==="SOUP"){
     pack.push("Fill each of the "+jarWord+" <b>halfway with the hot solids</b>, then ladle in boiling liquid to leave "+hs+'" headspace (the gap between food and rim). The half-solids / half-liquid ratio is a safety requirement, not a preference.');
   }else{
     const f=esc(foods[0].items.map(i=>i.name).join(" / "));
@@ -1034,7 +1114,9 @@ function assemblyCard(res,size){
       '<div style="flex:1"><div style="font-weight:700;font-size:14px;margin-bottom:2px">'+title+'</div>'+
       '<div style="font-size:13px;color:#5c574c;line-height:1.5">'+desc+'</div></div></div>';
   let map=mapRow('inj',jarSVG,loadN+' × '+sizeWord+' jars — all identical',
-    (res.verdict==="SOUP"
+    (res.author
+      ? 'The finished recipe mixture, ladled in hot and packed to the recipe\'s headspace. Every jar is the same.'
+      : res.verdict==="SOUP"
       ? 'Half-fill each jar with '+solidNames+', then cover with '+liqNames+'. Every jar is the same blend.'
       : solidNames+' packed and covered with '+liqNames+'. Every jar is the same.'));
   if(res.b.frz.length) map+=mapRow('frz',frzSVG,'Freezer',
@@ -1054,19 +1136,32 @@ function assemblyCard(res,size){
 }
 
 function resultsFor(size){
-  const res=router.stage(state.ings,{jarSize:size,ft:state.altFt,gauge:state.gauge,steps:state.recipeSteps});
+  const res=stageFor(size);
   const revItems=res.b.rev;
   // banner
   let banner="";
-  if(revItems.length){
+  if(res.author){
+    const cr=res.cr||{};
+    const miss=[cr.timePt==null&&cr.timeQt==null?"process time":"",cr.hs==null?"headspace":""].filter(Boolean).join(" and ");
+    banner='<div class="banner ok"><div class="bh">'+iconCheck()+' Already a canning recipe</div>'+
+      'This page is itself a tested canning recipe, so the whole mixture is packed as written — no ingredient triage. The time, pressure and headspace below are <b>the recipe author\'s</b>, read from its instructions; this tool did not derive them. <b>Confirm them against a USDA-tested source (nchfp.uga.edu) before canning.</b>'+
+      (miss?' <br><b style="color:var(--rust)">Couldn\'t read the '+miss+' from the page — enter it from the recipe yourself.</b>':'')+'</div>';
+  }else if(revItems.length){
     banner='<div class="banner warn"><div class="bh">'+iconMinus()+' Needs review: '+esc(revItems[0].name)+'</div>'+
       'This component didn\'t match a tested process, so it can\'t be verified. Everything else still stages normally — resolve this one manually against the USDA guide before canning.</div>';
   }else if(res.pctIn<100){
     banner='<div class="banner ok"><div class="bh">'+iconCheck()+' '+res.pctIn+'% cans as-is</div>'+
       'The in-jar portion maps to a tested process. The remaining components stage outside the jar (freeze or fresh) — this is component staging, not a recipe failure.</div>';
   }
+  // override toggle (only when the page was detected as a canning recipe)
+  let toggle="";
+  if(state.canRecipe){
+    toggle=state.forceTriage
+      ? '<button class="addlink" onclick="toggleCanMode()" style="margin:2px 0 12px">▸ This is a canning recipe — show the author’s process instead</button>'
+      : '<button class="addlink" onclick="toggleCanMode()" style="margin:2px 0 12px">▸ Show the ingredient breakdown instead</button>';
+  }
   // verdict text
-  const vt={SINGLE:"Single tested food",SOUP:"Soup pathway",NONE:"Nothing to can",undefined:""}[res.verdict]||res.verdict;
+  const vt={SINGLE:"Single tested food",SOUP:"Soup pathway",NONE:"Nothing to can",AUTHOR:"Author-tested canning recipe",undefined:""}[res.verdict]||res.verdict;
   // chips (only non-zero)
   const chips=[['inj','In-jar',res.pctIn]];
   if(res.pctFrz)chips.push(['frz','Freeze',res.pctFrz]);
@@ -1081,7 +1176,7 @@ function resultsFor(size){
     const pill=it.auto?"SEASONING?":PILL[pw][1];
     rows+='<div class="brk-row"><span class="nm">'+nm+'</span><span class="pill '+PILL[pw][0]+'">'+pill+'</span></div>';
   }));
-  return '<div class="card">'+banner+
+  return '<div class="card">'+banner+toggle+
       '<h2 style="margin-bottom:6px">'+esc(document.getElementById("rname").value)+'</h2>'+
       '<div style="font-size:12px;color:var(--muted);margin-bottom:14px">'+ (size==="pt"?"5-pint load":"4-quart load") +'</div>'+
       '<div class="donutwrap">'+donutSVG(res.pctIn)+
@@ -1099,7 +1194,7 @@ function renderResults(){
 
 /* ============================ RENDER: prepare ============================ */
 function prepareFor(size){
-  const res=router.stage(state.ings,{jarSize:size,ft:state.altFt,gauge:state.gauge,steps:state.recipeSteps});
+  const res=stageFor(size);
   const head='<div class="card" style="padding-bottom:15px"><h2 style="margin-bottom:4px">'+esc(document.getElementById("rname").value)+'</h2>'+
     '<div style="font-size:12px;color:var(--muted)">'+(size==="pt"?"5-pint load":"4-quart load")+' · preparation &amp; process</div></div>';
   const tail='<div class="card"><p class="disc" style="margin:0;border:none;padding:0">Triage aid only — confirm the exact time, pressure, and jar size against the USDA Complete Guide or nchfp.uga.edu before canning.</p></div>';
@@ -1189,7 +1284,7 @@ document.getElementById("clearbtn").addEventListener("click",()=>{
   if(impmsg){impmsg.className="";impmsg.textContent="";}
   const fb=document.getElementById("fallbackbox");
   if(fb)fb.innerHTML="";
-  state.ings=[];state.recipeSteps=[];state.analyzed=false;
+  state.ings=[];state.recipeSteps=[];state.canRecipe=null;state.forceTriage=false;state.analyzed=false;
   renderIngs();renderResults();renderPrepare();
   switchTab("analyze");
   document.querySelector("main").scrollTop=0;
