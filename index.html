@@ -305,8 +305,17 @@
         </div>
       </div>
       <div class="card">
+        <h2>Altitude &amp; gauge</h2>
+        <p class="hint">Water boils cooler at elevation, so the required pressure rises with altitude. Set your elevation and canner gauge type so every process shows the correct PSI.</p>
+        <input type="number" id="altinput" placeholder="Altitude in feet (0 if unsure at sea level)" min="0" step="100" style="margin-bottom:10px">
+        <div class="seg small" id="gaugeseg">
+          <button class="on" data-gauge="dial">Dial gauge</button>
+          <button data-gauge="weighted">Weighted gauge</button>
+        </div>
+      </div>
+      <div class="card">
         <h2>About this app</h2>
-        <div class="kv" style="color:#5c574c;font-size:13.5px;line-height:1.6;">Rules sourced from the USDA Complete Guide to Home Canning (2015) and the Ball Complete Book of Home Preserving, plus USDA freezing guidance for the vacuum-seal pathway. Preview build — runs entirely on-device once compiled to Android.</div>
+        <div class="kv" style="color:#5c574c;font-size:13.5px;line-height:1.6;">Rules sourced from the USDA Complete Guide to Home Canning (2015 revision) and the National Center for Home Food Preservation (nchfp.uga.edu), plus USDA freezing guidance for the vacuum-seal pathway. Preview build — runs entirely on-device once compiled to Android.</div>
       </div>
     </section>
   </main>
@@ -339,6 +348,7 @@ const DATA = {
     veg_beets:{name:"Beets",aliases:["beet","beets"],time:{pt:30,qt:35},hs:1},
     veg_carrots:{name:"Carrots",aliases:["carrot","carrots"],time:{pt:25,qt:30},hs:1},
     veg_corn:{name:"Corn, whole kernel",aliases:["corn","sweet corn","whole kernel corn"],time:{pt:55,qt:85},hs:1},
+    veg_corn_cream:{name:"Corn, cream style (pints only)",aliases:["cream corn","cream style corn","cream-style corn","creamed corn"],time:{pt:85,qt:null},hs:1},
     veg_greens:{name:"Greens / spinach",aliases:["spinach","kale","collard","greens","chard","mustard greens"],time:{pt:70,qt:90},hs:1},
     veg_mixed:{name:"Mixed vegetables (tested combo)",aliases:["mixed vegetables","mixed veg"],time:{pt:75,qt:90},hs:1},
     veg_mushrooms:{name:"Mushrooms, whole/sliced (domestic)",aliases:["mushroom","mushrooms","button mushroom","cremini","white mushroom"],time:{pt:45,qt:null},hs:1},
@@ -349,10 +359,11 @@ const DATA = {
     veg_pumpkin:{name:"Pumpkin / winter squash, cubed",aliases:["pumpkin","winter squash","butternut","acorn squash"],time:{pt:55,qt:90},hs:1},
     veg_sweetpotato:{name:"Sweet potatoes (pieces)",aliases:["sweet potato","yam"],time:{pt:65,qt:90},hs:1},
     veg_beans_dried:{name:"Dried beans/peas (rehydrated)",aliases:["dried bean","pinto bean","kidney bean","black bean","navy bean","chickpea","dried pea","legume"],time:{pt:75,qt:90},hs:1},
-    tomato_crushed:{name:"Tomatoes, crushed (acidified)",aliases:["crushed tomato","tomato"],time:{pt:15,qt:15},hs:0.5,acid:true}
+    tomato_crushed:{name:"Tomatoes, crushed (acidified)",aliases:["crushed tomato","tomato"],time:{pt:15,qt:15},hs:0.5,acid:true},
+    tomato_whole:{name:"Tomatoes, whole/halved in water (acidified)",aliases:["whole tomato","whole tomatoes","halved tomato","halved tomatoes"],time:{pt:10,qt:10},hs:0.5,acid:true}
   },
   soup:{time:{pt:60,qt:75}, seafood:{pt:100,qt:100}, hs:1,
-    rules:["Every solid must have its own tested recommendation (no cabbage, broccoli, cured meats).",
+    rules:["Every solid must have its own tested recommendation (no cabbage, broccoli, cauliflower, celery, summer squash, or cured/brined meats).",
            "Fill jar HALFWAY with solids, then cover with liquid (1:1) — a safety requirement.",
            "Boil the mixture 5 min before packing; pre-cook meat; fully rehydrate dried beans.",
            "No thickeners (flour, cornstarch, Clearjel). No dairy. No pasta/rice.",
@@ -361,13 +372,15 @@ const DATA = {
     items:["kimchi juice","brine","marinade","pickle juice","dill brine","buttermilk brine"]},
   blocks:{
     thickeners:{route:"frz", reason:"Thickeners slow heat penetration to the jar core (under-processing risk). Thicken after opening.",
-      items:["flour","cornstarch","corn starch","arrowroot","roux","tapioca","starch","gravy mix","cornflour","all-purpose flour"]},
+      items:["flour","cornstarch","corn starch","arrowroot","roux","tapioca","starch","gravy mix","cornflour","all-purpose flour","instant potato","potato flakes"]},
     concentrates:{route:"frz", reason:"Concentrated/dehydrated low-acid flavorings have no tested in-jar process. Build into a frozen sauce.",
-      items:["mushroom powder","dehydrated mushroom","dried mushroom","porcini powder","tomato powder","vegetable powder","bouillon","stock concentrate","demi-glace"]},
+      items:["mushroom powder","dehydrated mushroom","dried mushroom","porcini powder","tomato powder","vegetable powder","bouillon","stock concentrate","demi-glace","demiglace","tomato paste","tomato sauce","sun-dried tomato","sundried tomato"]},
+    wildMushrooms:{route:"frs", reason:"No tested process for wild or specialty mushrooms — the USDA process covers domestic button/cremini only, whole or sliced. Cook fresh, or simmer into a frozen sauce.",
+      items:["wild mushroom","porcini","shiitake","morel","chanterelle","maitake","enoki","hen of the woods","lion's mane","oyster mushroom","porcini mushroom","shiitake mushroom","morel mushroom","chanterelle mushroom","maitake mushroom","enoki mushroom","wild mushrooms"]},
     alcohol:{route:"frz", reason:"Wine/spirits aren't an approved jar liquid. Simmer into a frozen sauce (also mellows raw alcohol).",
       items:["red wine","white wine","wine","beer","sherry","vermouth","brandy","bourbon","rum","marsala"]},
     dairy:{route:"frs", reason:"Low-acid; curdles/separates and can fail the seal. Add fresh at serving.",
-      items:["milk","cream","heavy cream","half and half","butter","cheese","parmesan","cheddar","mozzarella","sour cream","yogurt","buttermilk","cream cheese","evaporated milk"]},
+      items:["milk","cream","heavy cream","half and half","butter","cheese","parmesan","cheddar","mozzarella","sour cream","yogurt","buttermilk","cream cheese","evaporated milk","condensed milk","cream of","cream of mushroom","cream of chicken","cream soup"]},
     grains:{route:"frs", reason:"Swell and turn to paste; heat unevenly. Cook fresh and add at serving.",
       items:["pasta","noodle","noodles","macaroni","spaghetti","rice","barley","quinoa","orzo","dumpling","couscous","egg noodle"]},
     eggs:{route:"frs", reason:"No research-tested process for home-canned eggs.", items:["egg","eggs","hard boiled egg"]},
@@ -378,9 +391,9 @@ const DATA = {
     untestedVeg:{route:"frs", reason:"No USDA-tested process; texture also degrades badly under pressure.",
       items:["cabbage","broccoli","cauliflower","celery","brussels sprout","summer squash","zucchini","eggplant","kohlrabi","lettuce","bok choy","artichoke"]},
     condiments:{route:"frs", reason:"Condiments/emulsions — add fresh at serving.",
-      items:["mayonnaise","mayo","dijon","yellow mustard","prepared mustard","ketchup","relish","hot sauce","bbq sauce","pickle","pickles"]},
+      items:["mayonnaise","mayo","dijon","yellow mustard","prepared mustard","ketchup","relish","hot sauce","bbq sauce","pickle","pickles","bearnaise","béarnaise","hollandaise"]},
     bread:{route:"frs", reason:"Breads / assembly items — serve fresh.",
-      items:["bun","buns","bread","roll","rolls","tortilla","brioche","crouton","breadcrumb","panko","biscuit"]},
+      items:["bun","buns","bread","roll","rolls","tortilla","brioche","crouton","breadcrumb","panko","biscuit","gingerbread"]},
     puree:{route:"rev", reason:"Pureed/mashed low-acid foods have NO tested process — heat can't be guaranteed to reach the center.",
       items:["puree","pureed","mashed","refried","mashed potato","mashed squash","meat paste"]}
   },
@@ -422,13 +435,15 @@ class StagingRouter{
       return {jp:null,verdict:"NONE",w:["No tested in-jar ingredients. Nothing to can as written."]};
     }
     solids.forEach(i=>{if(i.proc.time[jarSize]==null)w.push(i.proc.name+" has no tested process for "+(jarSize==="pt"?"pints":"quarts")+" — use the other jar size.");});
-    const seafood=solids.some(i=>i.cat==="seafood_fish"||/seafood|shrimp|crab|clam|oyster/.test(this._n(i.name)));
+    const seafood=solids.some(i=>{const n=this._n(i.name);
+      return i.cat==="seafood_fish"||(/seafood|shrimp|crab|clam|oyster/.test(n)&&n.indexOf("oyster mushroom")<0);});
+    const acid=solids.some(i=>i.proc.acid);
     if(solids.length===1){const o=solids[0];const t=o.proc.time[jarSize];
-      return {jp:t==null?null:{t,psi,hs:o.proc.hs,basis:o.proc.name},verdict:"SINGLE",w};}
+      return {jp:t==null?null:{t,psi,hs:o.proc.hs,basis:o.proc.name,acid},verdict:"SINGLE",w};}
     const st=seafood?this.d.soup.seafood[jarSize]:this.d.soup.time[jarSize];
     w.push("Multiple tested foods in one jar → USDA 'your choice' soup pathway (half solids / half liquid, no thickeners/dairy/pasta).");
     if(seafood)w.push("Seafood present → whole jar held at 100 min.");
-    return {jp:{t:st,psi,hs:this.d.soup.hs,basis:"USDA 'your choice' soup",soup:true},verdict:"SOUP",w};
+    return {jp:{t:st,psi,hs:this.d.soup.hs,basis:"USDA 'your choice' soup",soup:true,acid},verdict:"SOUP",w};
   }
   stage(ings,opt){
     const b={inj:[],frz:[],frs:[],prep:[],rev:[],seas:[]};const w=[];
@@ -498,6 +513,8 @@ function parseRecipeText(text){
 const router=new StagingRouter(DATA);
 const state={
   loadSize:"pt",
+  altFt:0,             // user's elevation — drives the PSI adjustment
+  gauge:"dial",        // "dial" | "weighted"
   recipeSteps:[],
   ings:[
     {name:"boneless chicken thighs",amount:2,unit:"lb"},
@@ -814,8 +831,9 @@ function procCard(jp,verdict,size){
   let h='<div class="card"><h2>Jar process</h2>'+
     '<div class="proc-line"><span class="k">Basis</span><span class="v">'+esc(jp.basis)+'</span></div>'+
     '<div class="proc-line"><span class="k">Process ('+label+')</span><span class="v">'+jp.t+' min</span></div>'+
-    '<div class="proc-line"><span class="k">Pressure</span><span class="v">'+jp.psi+' PSI (dial)</span></div>'+
+    '<div class="proc-line"><span class="k">Pressure</span><span class="v">'+jp.psi+' PSI ('+(state.gauge==="weighted"?"weighted":"dial")+' gauge'+(state.altFt>0?", "+state.altFt+" ft":"")+')</span></div>'+
     '<div class="proc-line"><span class="k">Headspace</span><span class="v">'+jp.hs+' in</span></div>';
+  if(jp.acid){h+='<div class="scale-box" style="margin:14px 0 0">Tomatoes <b>must be acidified</b>: add 2 tbsp bottled lemon juice or ½ tsp citric acid per quart (1 tbsp / ¼ tsp per pint) to each jar before filling. This is a safety requirement, not optional.</div>';}
   if(jp.soup){h+='<ul class="rules" style="margin:14px 0 0;padding-left:18px">'+DATA.soup.rules.map(r=>'<li>'+esc(r)+'</li>').join("")+'</ul>';}
   h+='</div>';return h;
 }
@@ -889,6 +907,9 @@ function planCard(res,size){
 
   // Pack the jars
   const pack=[];
+  if(res.jp.acid){
+    pack.push("Acidify first: put <b>2 tbsp bottled lemon juice or ½ tsp citric acid</b> into each quart jar (1 tbsp / ¼ tsp per pint) before any food goes in. Required whenever tomatoes are in the jar — fresh lemon juice is not a substitute.");
+  }
   if(res.verdict==="SOUP"){
     pack.push("Fill each of the "+jarWord+" <b>halfway with the hot solids</b>, then ladle in boiling liquid to leave "+hs+'" headspace (the gap between food and rim). The half-solids / half-liquid ratio is a safety requirement, not a preference.');
   }else{
@@ -1010,7 +1031,7 @@ function assemblyCard(res,size){
 }
 
 function resultsFor(size){
-  const res=router.stage(state.ings,{jarSize:size});
+  const res=router.stage(state.ings,{jarSize:size,ft:state.altFt,gauge:state.gauge});
   const revItems=res.b.rev;
   // banner
   let banner="";
@@ -1053,7 +1074,7 @@ function renderResults(){
 
 /* ============================ RENDER: prepare ============================ */
 function prepareFor(size){
-  const res=router.stage(state.ings,{jarSize:size});
+  const res=router.stage(state.ings,{jarSize:size,ft:state.altFt,gauge:state.gauge});
   const head='<div class="card" style="padding-bottom:15px"><h2 style="margin-bottom:4px">'+esc(document.getElementById("rname").value)+'</h2>'+
     '<div style="font-size:12px;color:var(--muted)">'+(size==="pt"?"5-pint load":"4-quart load")+' · preparation &amp; process</div></div>';
   const tail='<div class="card"><p class="disc" style="margin:0;border:none;padding:0">Triage aid only — confirm the exact time, pressure, and jar size against the USDA Complete Guide or nchfp.uga.edu before canning.</p></div>';
@@ -1094,7 +1115,26 @@ function updateCtx(){
   const el=document.getElementById("ctxline");if(!el)return;
   const load=state.loadSize==="qt"?"4-quart load":state.loadSize==="both"?"pint + quart":"5-pint load";
   const n=state.ings.length;
-  el.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2h10"/><path d="M8 2v3l-1 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V7l-1-2V2"/></svg>'+load+' · '+n+' ingredient'+(n===1?"":"s");
+  el.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2h10"/><path d="M8 2v3l-1 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V7l-1-2V2"/></svg>'+load+' · '+n+' ingredient'+(n===1?"":"s")+(state.altFt>0?' · '+state.altFt+' ft':'');
+}
+
+/* settings persistence — altitude/gauge are safety inputs, so they must survive a relaunch */
+function saveSettings(){
+  try{localStorage.setItem("cucSettings",JSON.stringify({loadSize:state.loadSize,altFt:state.altFt,gauge:state.gauge}));}catch(e){}
+}
+function loadSettings(){
+  try{
+    const s=JSON.parse(localStorage.getItem("cucSettings"));
+    if(!s)return;
+    if(["pt","qt","both"].includes(s.loadSize))state.loadSize=s.loadSize;
+    state.altFt=Math.max(0,+s.altFt||0);
+    state.gauge=s.gauge==="weighted"?"weighted":"dial";
+  }catch(e){}
+}
+function reflectSettings(){
+  document.querySelectorAll("#loadseg button").forEach(b=>b.classList.toggle("on",b.dataset.load===state.loadSize));
+  document.querySelectorAll("#gaugeseg button").forEach(b=>b.classList.toggle("on",b.dataset.gauge===state.gauge));
+  document.getElementById("altinput").value=state.altFt||"";
 }
 
 function switchTab(name){
@@ -1109,7 +1149,11 @@ document.querySelectorAll("#nav button").forEach(b=>b.addEventListener("click",(
 document.getElementById("importseg").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{
   document.querySelectorAll("#importseg button").forEach(x=>x.classList.remove("on"));b.classList.add("on");setImport(b.dataset.imp);}));
 document.getElementById("loadseg").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{
-  document.querySelectorAll("#loadseg button").forEach(x=>x.classList.remove("on"));b.classList.add("on");state.loadSize=b.dataset.load;updateCtx();}));
+  document.querySelectorAll("#loadseg button").forEach(x=>x.classList.remove("on"));b.classList.add("on");state.loadSize=b.dataset.load;saveSettings();updateCtx();}));
+document.getElementById("gaugeseg").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll("#gaugeseg button").forEach(x=>x.classList.remove("on"));b.classList.add("on");state.gauge=b.dataset.gauge;saveSettings();}));
+document.getElementById("altinput").addEventListener("input",e=>{
+  state.altFt=Math.max(0,parseInt(e.target.value,10)||0);saveSettings();updateCtx();});
 document.getElementById("adding").addEventListener("click",()=>{state.ings.push({name:"",amount:1,unit:"cup"});renderIngs();});
 document.getElementById("analyzebtn").addEventListener("click",()=>{state.analyzed=true;switchTab("results");});
 document.getElementById("clearbtn").addEventListener("click",()=>{
@@ -1149,7 +1193,7 @@ function savePDF(){
 document.getElementById("pdfbtn").addEventListener("click",savePDF);
 
 /* init */
-renderIngs();setImport("photo");renderFAQ("");renderResults();
+loadSettings();reflectSettings();renderIngs();setImport("photo");renderFAQ("");renderResults();
 </script>
 </body>
 </html>

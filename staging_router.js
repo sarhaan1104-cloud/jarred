@@ -37,6 +37,7 @@ class StagingRouter {
     this.soup = data.soupGate;
     this.blocks = data.notInJar;
     this.seasonings = data.seasonings_noCount;
+    this.prep = data.prepStage_brine || { items: [], reason: "" };
   }
 
   // --- normalize a name for matching ---
@@ -65,6 +66,12 @@ class StagingRouter {
   classify(ingredient) {
     const name = ingredient.name;
     const candidates = [];
+
+    // brines/marinades (priority 2 so "buttermilk brine" beats the dairy block "buttermilk")
+    const pLen2 = this._bestMatchLen(name, this.prep.items);
+    if (pLen2) candidates.push({ len: pLen2, priority: 2, result: {
+      pathway: "prepStage", category: "prepStage_brine",
+      reason: this.prep.reason || "Used before canning, then discarded. Not packed in the jar." } });
 
     // seasonings
     const sLen = this._bestMatchLen(name, this.seasonings.items);
@@ -155,8 +162,17 @@ class StagingRouter {
       return { item: it, time: t };
     });
 
-    const hasSeafood = solids.some(it =>
-      it.category === "seafood_fish" || /seafood|shrimp|crab|clam|oyster/.test(this._norm(it.name)));
+    const hasSeafood = solids.some(it => {
+      const n = this._norm(it.name);
+      return it.category === "seafood_fish" ||
+        (/seafood|shrimp|crab|clam|oyster/.test(n) && !n.includes("oyster mushroom"));
+    });
+
+    // surface acidification requirements (tomatoes) as explicit warnings
+    solids.forEach(it => {
+      if (it.process && it.process.acidRule)
+        warnings.push(`${it.process.displayName}: ${it.process.acidRule}`);
+    });
 
     // SINGLE solid food (broth, if any, is just its covering liquid)
     if (solids.length === 1) {
@@ -197,7 +213,7 @@ class StagingRouter {
       gauge: opts.gauge || "dial"        // "dial" | "weighted"
     };
 
-    const buckets = { pathway1: [], pathway2: [], pathway3: [], seasonings: [], unknown: [], blocked: [] };
+    const buckets = { pathway1: [], pathway2: [], pathway3: [], prepStage: [], seasonings: [], unknown: [], blocked: [] };
     const warnings = [];
 
     for (const ing of ingredients) {
@@ -210,6 +226,8 @@ class StagingRouter {
                           warnings.push(`"${ing.name}" -> freeze/vacuum-seal: ${c.reason}`); break;
         case "pathway3":  buckets.pathway3.push(entry);
                           warnings.push(`"${ing.name}" -> add fresh at serving: ${c.reason}`); break;
+        case "prepStage": buckets.prepStage.push(entry);
+                          warnings.push(`"${ing.name}" -> prep only: ${c.reason}`); break;
         case "seasoning": buckets.seasonings.push(entry); break;
         case "blocked":   buckets.blocked.push(entry);
                           warnings.push(`"${ing.name}" -> CANNOT be canned in any form: ${c.reason}`); break;
@@ -239,6 +257,7 @@ class StagingRouter {
       pathway1_inJar: buckets.pathway1,
       pathway2_freezeVacuumSeal: buckets.pathway2,
       pathway3_freshAtServing: buckets.pathway3,
+      prepStage_noPack: buckets.prepStage,
       blocked: buckets.blocked,
       seasonings_noCount: buckets.seasonings,
       unknown: buckets.unknown,

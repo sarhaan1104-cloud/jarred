@@ -109,7 +109,7 @@
     "timeSeafood": {"pt": 100, "qt": 100},
     "headspaceInch": 1.0,
     "rules": [
-      "Every solid ingredient must itself have a tested canning recommendation (i.e. appear in pathway1_inJar). No cabbage, no broccoli, no cured/brined meats.",
+      "Every solid ingredient must itself have a tested canning recommendation (i.e. appear in pathway1_inJar). No cabbage, broccoli, cauliflower, celery, summer squash, or cured/brined meats.",
       "Fill jar HALFWAY with solids, then cover with liquid (broth/water/tomatoes), 1-inch headspace. The 1:1 solid-to-liquid ratio is a safety requirement, not a preference.",
       "Boil the combined mixture 5 minutes before packing.",
       "Meat must be pre-cooked before canning.",
@@ -126,13 +126,13 @@
     "hardBlock_thickeners": {
       "route": "pathway2_thickenAtServing",
       "reason": "Thickeners slow heat penetration to the jar core, causing under-processing (botulism risk).",
-      "items": ["flour", "cornstarch", "corn starch", "arrowroot", "roux", "tapioca", "starch", "instant potato", "gravy mix", "cornflour"],
+      "items": ["flour", "cornstarch", "corn starch", "arrowroot", "roux", "tapioca", "starch", "instant potato", "potato flakes", "gravy mix", "cornflour"],
       "clearjelException": "Modified starch (Clearjel) is safe ONLY inside a specific tested recipe that calls for it by name and amount. It is NOT permitted in the free-choice soup pathway."
     },
     "hardBlock_dairy": {
       "route": "pathway3_freshAtServing",
       "reason": "Low-acid, not safe to can; curdles/separates and can cause seal failure and spoilage.",
-      "items": ["milk", "cream", "heavy cream", "half and half", "butter", "cheese", "parmesan", "cheddar", "mozzarella", "sour cream", "yogurt", "buttermilk", "cream cheese", "evaporated milk", "condensed milk"]
+      "items": ["milk", "cream", "heavy cream", "half and half", "butter", "cheese", "parmesan", "cheddar", "mozzarella", "sour cream", "yogurt", "buttermilk", "cream cheese", "evaporated milk", "condensed milk", "cream of", "cream of mushroom", "cream of chicken", "cream soup"]
     },
     "hardBlock_starchGrains": {
       "route": "pathway3_freshAtServing",
@@ -168,7 +168,12 @@
     "hardBlock_concentrates": {
       "route": "pathway2_freezeVacuumSeal",
       "reason": "Concentrated/dehydrated low-acid flavorings have no tested in-jar process and add uneven density. Use them to build a Pathway-2 sauce.",
-      "items": ["mushroom powder", "dehydrated mushroom", "dried mushroom", "porcini powder", "tomato powder", "vegetable powder", "bouillon", "stock concentrate", "demi-glace", "demiglace"]
+      "items": ["mushroom powder", "dehydrated mushroom", "dried mushroom", "porcini powder", "tomato powder", "vegetable powder", "bouillon", "stock concentrate", "demi-glace", "demiglace", "tomato paste", "tomato sauce", "sun-dried tomato", "sundried tomato"]
+    },
+    "hardBlock_wildMushrooms": {
+      "route": "pathway3_freshAtServing_or_freeze",
+      "reason": "No tested process for wild or specialty mushrooms - the USDA mushroom process covers domestic button/cremini only, whole or sliced. Cook fresh, or simmer into a Pathway-2 sauce.",
+      "items": ["wild mushroom", "wild mushrooms", "porcini", "shiitake", "morel", "chanterelle", "maitake", "enoki", "hen of the woods", "lion's mane", "oyster mushroom", "porcini mushroom", "shiitake mushroom", "morel mushroom", "chanterelle mushroom", "maitake mushroom", "enoki mushroom"]
     },
     "hardBlock_alcohol": {
       "route": "pathway2_freezeVacuumSeal",
@@ -185,6 +190,12 @@
       "reason": "Breads / assembly items - serve fresh.",
       "items": ["bun", "buns", "bread", "roll", "rolls", "tortilla", "crouton", "breadcrumb", "panko", "biscuit"]
     }
+  },
+
+  "prepStage_brine": {
+    "_note": "Brines/marinades are used before canning, then drained and DISCARDED. They never go in the jar and do not count toward jar fill.",
+    "reason": "Brine / marinade - used before canning, then discarded. Not packed in the jar.",
+    "items": ["brine", "marinade", "pickle juice", "kimchi juice", "dill brine", "buttermilk brine"]
   },
 
   "seasonings_noCount": {
