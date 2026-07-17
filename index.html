@@ -250,7 +250,7 @@
 <div class="shell">
   <header>
     <div class="brandrow">
-      <div class="avatar">
+      <div class="avatar" id="logohome" role="button" tabindex="0" aria-label="New recipe — clear all fields and go to Analyze" title="New recipe (clear all)" style="cursor:pointer">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l3 3v3H6z"/><path d="M6 8h12v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1z"/><path d="M10 13h4"/></svg>
       </div>
       <h1>CAN U CAN IT!</h1>
@@ -1410,7 +1410,7 @@ document.getElementById("altinput").addEventListener("input",e=>{
   state.altFt=Math.max(0,parseInt(e.target.value,10)||0);saveSettings();updateCtx();});
 document.getElementById("adding").addEventListener("click",()=>{state.ings.push({name:"",amount:1,unit:"cup"});renderIngs();});
 document.getElementById("analyzebtn").addEventListener("click",()=>{state.analyzed=true;switchTab("results");});
-document.getElementById("clearbtn").addEventListener("click",()=>{
+function newRecipe(){
   document.getElementById("rname").value="";
   const urlbox=document.getElementById("urlbox");
   if(urlbox)urlbox.value="";
@@ -1422,7 +1422,10 @@ document.getElementById("clearbtn").addEventListener("click",()=>{
   renderIngs();renderResults();renderPrepare();
   switchTab("analyze");
   document.querySelector("main").scrollTop=0;
-});
+}
+document.getElementById("clearbtn").addEventListener("click",newRecipe);
+document.getElementById("logohome").addEventListener("click",newRecipe);
+document.getElementById("logohome").addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();newRecipe();}});
 document.getElementById("faqsearch").addEventListener("input",e=>renderFAQ(e.target.value));
 
 /* ---- Save to PDF (uses the browser print sheet → "Save as PDF") ---- */
