@@ -129,6 +129,7 @@
   .pill.prep{background:var(--olive-bg); color:var(--olive-ink);}
   .pill.rev{background:var(--red-bg); color:var(--red-ink);}
   .pill.seas{background:#efe9dc; color:var(--muted);}
+  .pill.serve{background:#e6eef0; color:#4a6572;}
 
   .proc-line{display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--line); font-size:14.5px;}
   .proc-line:last-child{border-bottom:none;}
@@ -460,7 +461,7 @@ class StagingRouter{
     return {jp:{t:st,psi,hs:this.d.soup.hs,basis:"USDA 'your choice' soup",soup:true,acid},verdict:"SOUP",w};
   }
   stage(ings,opt){
-    const b={inj:[],frz:[],frs:[],prep:[],rev:[],seas:[]};const w=[];
+    const b={inj:[],frz:[],frs:[],prep:[],rev:[],seas:[],serve:[]};const w=[];
     ings.forEach(ing=>{const c=this.classify(ing.name);
       const e=Object.assign({name:ing.name,cups:toCups(ing.amount,ing.unit,ing.name)},c);
       (b[c.pw]||b.rev).push(e);});
@@ -476,10 +477,20 @@ class StagingRouter{
         b.seas.push(e);
       }
     });
+    // Serving/garnish items (rice to serve over, toppings) the recipe adds only
+    // at the table are moved to a no-count "serving" bucket — excluded from the
+    // pass math, like seasonings and brine. They still show in the breakdown.
+    ["frz","frs","rev"].forEach(pw=>b[pw].slice().forEach(e=>{
+      if(servedAtServing(e.name,steps)){
+        b[pw].splice(b[pw].indexOf(e),1);
+        e.origPw=pw;e.pw="serve";e.serving=true;
+        b.serve.push(e);
+      }
+    }));
     const res=this.jarProcess(b.inj,opt.jarSize,opt.ft||0,opt.gauge||"dial");
     const jarCups=b.inj.reduce((s,i)=>s+i.cups,0);
     const outCups=[...b.frz,...b.frs,...b.rev].reduce((s,i)=>s+i.cups,0);
-    const tot=jarCups+outCups;
+    const tot=jarCups+outCups;   // serve + seas + prep are excluded (no-count)
     const pct=v=>tot?Math.round(v/tot*100):0;
     return {b,jp:res.jp,verdict:res.verdict,warnings:w.concat(res.w),
       pctIn:pct(jarCups),pctFrz:pct(b.frz.reduce((s,i)=>s+i.cups,0)),
@@ -562,6 +573,29 @@ function placementInJar(name,steps){
     if(JAR_STEP.test(low)) return true;
   }
   return false;
+}
+/* ---- is this ingredient added ONLY at serving (rice to serve over, garnishes,
+   toppings)? If so it shouldn't count against how much of the recipe cans — it
+   is inherently added at the table, like the seasonings/brine we already exclude.
+   Matched against the recipe's own steps, ignoring common cooking/color words so
+   "brown rice" doesn't collide with "brown the chicken". */
+const _SERVE_STOP=/^(brown|white|black|green|red|fresh|small|large|ground|sliced|diced|chopped|whole|warm|cold|boneless|skinless|cooked|minced|optional|adjust|heat|extra|virgin|style|pieces|cubes|about|into|with|your|favorite|favourite|sodium|inch|steamed)$/;
+function servedAtServing(name,steps){
+  if(!steps||!steps.length) return false;
+  const n=(name||"").toLowerCase().trim();
+  if(!n) return false;
+  const toks=n.split(/[^a-z]+/).filter(w=>w.length>=4&&!_SERVE_STOP.test(w));
+  if(!toks.length&&n.length<4) return false;
+  let served=false,cooked=false;
+  for(const raw of steps){
+    if(!raw) continue;
+    const low=" "+String(raw).toLowerCase()+" ";
+    const hit=low.indexOf(n)>=0||toks.some(t=>low.indexOf(t)>=0);
+    if(!hit) continue;
+    if(SERVE_STEP.test(low)) served=true;
+    else if(JAR_STEP.test(low)) cooked=true;
+  }
+  return served&&!cooked;   // only exclude PURE serving items, never cooked ones
 }
 
 /* ---- Is the imported page ITSELF a tested canning recipe? ----
@@ -674,7 +708,7 @@ const state={
   ings:[]
 };
 const UNITS=["cup","tbsp","tsp","oz","lb","each"];
-const PILL={inj:["inj","IN-JAR"],frz:["frz","FREEZE"],frs:["frs","FRESH"],prep:["prep","PREP"],rev:["rev","REVIEW"],seas:["seas","SEASONING"]};
+const PILL={inj:["inj","IN-JAR"],frz:["frz","FREEZE"],frs:["frs","FRESH"],prep:["prep","PREP"],rev:["rev","REVIEW"],seas:["seas","SEASONING"],serve:["serve","SERVING"]};
 
 /* ============================ RENDER: analyze ============================ */
 function renderIngs(){
@@ -1133,7 +1167,7 @@ function sortSteps(res){
   if(!raw.length) return {jarSteps,outSteps};
   // build an ingredient -> pathway index from the staged result
   const idx=[];
-  ["inj","frz","frs","prep","rev","seas"].forEach(pw=>res.b[pw].forEach(it=>{
+  ["inj","frz","frs","prep","rev","seas","serve"].forEach(pw=>res.b[pw].forEach(it=>{
     const nm=String(it.name).toLowerCase();
     idx.push({pw:pw,name:nm,toks:nm.split(/[^a-z]+/).filter(w=>w.length>=4)});
   }));
@@ -1196,15 +1230,16 @@ function assemblyCard(res,size){
       : solidNames+' packed and covered with '+liqNames+'. Every jar is the same.'));
   if(res.b.frz.length) map+=mapRow('frz',frzSVG,'Freezer',
     res.b.frz.map(i=>esc(i.name)).join(", ")+' — portion into freezer bags or vacuum-seal; label &amp; date.');
-  if(res.b.frs.length) map+=mapRow('frs',frsSVG,'Fresh — fridge / pantry',
-    res.b.frs.map(i=>esc(i.name)).join(", ")+' — buy or make these the day you serve.');
+  const freshList=[...res.b.frs,...res.b.serve];
+  if(freshList.length) map+=mapRow('frs',frsSVG,'Fresh / serving — fridge / pantry',
+    freshList.map(i=>esc(i.name)).join(", ")+' — buy or make these the day you serve.');
   // rebuild
   const serveSteps=sortSteps(res).outSteps.map(o=>o.txt);
   const rebuild=[];
   rebuild.push('Open <b>one '+sizeWord+' jar</b> per meal, tip it into a pan, and <b>boil the contents 10 minutes</b> before tasting — the standard safety step for home-canned low-acid food.');
   if(res.b.frz.length) rebuild.push('Bring the freezer items out to thaw — '+res.b.frz.map(i=>esc(i.name)).join(", ")+' — and reheat any sauces or gravies to stir in.');
   if(serveSteps.length) serveSteps.forEach(s=>rebuild.push(esc(s)));
-  else if(res.b.frs.length) rebuild.push('Finish with the fresh parts — '+res.b.frs.map(i=>esc(i.name)).join(", ")+' — and plate up.');
+  else if(freshList.length) rebuild.push('Finish with the fresh parts — '+freshList.map(i=>esc(i.name)).join(", ")+' — and plate up.');
   return '<div class="card"><h2>Pack &amp; store — what goes where</h2>'+map+
     '<div class="plan-lab" style="margin-top:16px">Rebuild the meal</div>'+
     '<ol class="plan-steps">'+rebuild.map(s=>'<li>'+s+'</li>').join("")+'</ol></div>';
@@ -1214,9 +1249,9 @@ function flavorCard(res){
   if(!res.jp) return "";
   const core=res.b.inj.filter(i=>!(i.proc&&i.proc.liquid));
   if(!core.length) return "";
-  const seas=res.b.seas||[], prep=res.b.prep||[], fresh=res.b.frs||[], frz=res.b.frz||[];
+  const seas=res.b.seas||[], prep=res.b.prep||[], fresh=res.b.frs||[], frz=res.b.frz||[], serve=res.b.serve||[];
   // nothing to split (e.g. author mode packs everything) → skip
-  if(!seas.length&&!prep.length&&!fresh.length&&!frz.length) return "";
+  if(!seas.length&&!prep.length&&!fresh.length&&!frz.length&&!serve.length) return "";
   const nm=a=>a.map(i=>esc(i.name)).join(", ");
   const dim=s=>' <span style="color:var(--muted)">'+s+'</span>';
   const inJar=['<li><b>'+nm(core)+'</b>'+dim('— the core, packed and processed')+'</li>'];
@@ -1225,6 +1260,7 @@ function flavorCard(res){
   const later=[];
   fresh.forEach(i=>later.push('<li>'+esc(i.name)+'</li>'));
   frz.forEach(i=>later.push('<li>'+esc(i.name)+dim('— from the freezer')+'</li>'));
+  serve.forEach(i=>later.push('<li>'+esc(i.name)+dim('— serving / garnish (not counted)')+'</li>'));
   return '<div class="card"><h2>Flavor: canned in vs. added fresh</h2>'+
     '<p class="hint">How much of the dish’s flavor rides into the jar with the food, and what you add when you serve.</p>'+
     '<div class="plan-lab">Flavor canned with the food</div><ol class="plan-steps">'+inJar.join("")+'</ol>'+
@@ -1266,7 +1302,7 @@ function resultsFor(size){
   if(res.pctRev)chips.push(['rev','Review',res.pctRev]);
   const chipsH='<div class="chips">'+chips.map(c=>'<div class="chip '+c[0]+'"><b>'+c[2]+'%</b><span>'+c[1]+'</span></div>').join("")+'</div>';
   // breakdown
-  const order=["inj","prep","frz","frs","rev","seas"];
+  const order=["inj","prep","frz","frs","rev","seas","serve"];
   let rows="";
   order.forEach(pw=>res.b[pw].forEach(it=>{
     const nm=esc(it.name)+(it.auto?' <span style="font-size:11px;color:var(--muted);font-style:italic">— placement from recipe steps; confirm it\'s only a flavoring</span>':"");
@@ -1277,7 +1313,7 @@ function resultsFor(size){
       '<h2 style="margin-bottom:6px">'+esc(document.getElementById("rname").value)+'</h2>'+
       '<div style="font-size:12px;color:var(--muted);margin-bottom:14px">'+ (size==="pt"?"5-pint load":"4-quart load") +'</div>'+
       '<div class="donutwrap">'+donutSVG(res.pctIn)+
-        '<div><p class="verdict-t">'+esc(vt)+'</p><p class="verdict-s">Goal: ≤15% outside-jar, weighted by volume. Seasonings and brine (PREP) are excluded from this math.</p></div></div>'+
+        '<div><p class="verdict-t">'+esc(vt)+'</p><p class="verdict-s">Goal: ≤15% outside-jar, weighted by volume. Seasonings, brine (PREP) and serving/garnish items are excluded from this math.</p></div></div>'+
       chipsH+'</div>'+
     '<div class="card"><h2>Ingredient breakdown</h2>'+rows+
       '<p class="disc">Percentages are a volume estimate (units converted to cups) for planning, not a precise measure. This is a triage aid — it does not certify the recipe as safe. Confirm the exact process against the USDA Complete Guide or nchfp.uga.edu before canning.</p></div>'+
@@ -1515,6 +1551,16 @@ function runSelfTests(){
   eq("stage: tomato sets acid flag", tom.jp?!!tom.jp.acid:false, true);
   const alt=router.stage([{name:"beef",amount:1,unit:"lb"}],{jarSize:"qt",ft:5000,gauge:"dial"});
   eq("stage: 5000 ft dial → 13 psi", alt.jp?alt.jp.psi:null, 13);
+
+  // --- serving/garnish exclusion (regression: serving lines must not lower %) ---
+  var cook=["Add the chicken to the skillet and brown on one side.","Serve with steamed rice and top with green onions."];
+  eq("serve: rice-to-serve detected", servedAtServing("Brown or white rice sliced green onions",cook), true);
+  eq("serve: not fooled by 'brown the chicken'", servedAtServing("boneless skinless chicken breasts",cook), false);
+  eq("serve: no steps => not serving", servedAtServing("rice",[]), false);
+  var wServe=router.stage([{name:"boneless skinless chicken breasts",amount:1.5,unit:"lb"},{name:"soy sauce",amount:3,unit:"tbsp"},{name:"Brown or white rice sliced green onions",amount:1,unit:"each"}],{jarSize:"qt",ft:0,gauge:"dial",steps:cook});
+  eq("serve: rice moved to serve bucket", wServe.b.serve.map(i=>i.name), ["Brown or white rice sliced green onions"]);
+  var nServe=router.stage([{name:"boneless skinless chicken breasts",amount:1.5,unit:"lb"},{name:"soy sauce",amount:3,unit:"tbsp"},{name:"Brown or white rice sliced green onions",amount:1,unit:"each"}],{jarSize:"qt",ft:0,gauge:"dial",steps:[]});
+  eq("serve: excluding serving raises in-jar %", wServe.pctIn>nServe.pctIn, true);
 
   // --- render ---
   const pass=T.filter(t=>t.pass).length, fail=T.length-pass;
