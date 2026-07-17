@@ -405,13 +405,13 @@ const DATA = {
     untestedVeg:{route:"frs", reason:"No USDA-tested process; texture also degrades badly under pressure.",
       items:["cabbage","broccoli","cauliflower","celery","brussels sprout","summer squash","zucchini","eggplant","kohlrabi","lettuce","bok choy","artichoke"]},
     condiments:{route:"frs", reason:"Condiments/emulsions — add fresh at serving.",
-      items:["mayonnaise","mayo","dijon","yellow mustard","prepared mustard","ketchup","relish","hot sauce","bbq sauce","pickle","pickles","bearnaise","béarnaise","hollandaise"]},
+      items:["mayonnaise","mayo","dijon","yellow mustard","prepared mustard","ketchup","relish","hot sauce","bbq sauce","barbecue sauce","pickle","pickles","bearnaise","béarnaise","hollandaise","soy sauce","tamari","fish sauce","hoisin","teriyaki","oyster sauce","sriracha","ponzu"]},
     bread:{route:"frs", reason:"Breads / assembly items — serve fresh.",
       items:["bun","buns","bread","roll","rolls","tortilla","brioche","crouton","breadcrumb","panko","biscuit","gingerbread"]},
     puree:{route:"rev", reason:"Pureed/mashed low-acid foods have NO tested process — heat can't be guaranteed to reach the center.",
       items:["puree","pureed","mashed","refried","mashed potato","mashed squash","meat paste"]}
   },
-  seasonings:["salt","pepper","black pepper","white pepper","sugar","cumin","cumin seed","paprika","smoked paprika","chili powder","chile powder","cayenne","cayenne pepper","chipotle powder","ancho powder","garlic powder","onion powder","garlic salt","onion salt","seasoned salt","seasoning salt","oregano","basil","thyme","bay leaf","bay leaves","herbes de provence","italian seasoning","poultry seasoning","cajun seasoning","creole seasoning","old bay","taco seasoning","curry powder","red pepper flakes","cinnamon","nutmeg","mace","allspice","ground allspice","clove","cloves","ground clove","cardamom","gochugaru","ginger","ginger powder","ground ginger","turmeric","coriander","coriander seed","celery seed","celery salt","mustard seed","mustard seeds","mustard powder","dry mustard","ground mustard","fennel seed","fennel seeds","caraway","caraway seed","dill seed","dill weed","dill","marjoram","rosemary","sage","tarragon","savory","fenugreek","sumac","star anise","dried herb","dried herbs","dried spice","dried spices","garlic"]
+  seasonings:["salt","pepper","black pepper","white pepper","sugar","cumin","cumin seed","paprika","smoked paprika","chili powder","chile powder","cayenne","cayenne pepper","chipotle powder","ancho powder","garlic powder","onion powder","garlic salt","onion salt","seasoned salt","seasoning salt","oregano","basil","thyme","bay leaf","bay leaves","herbes de provence","italian seasoning","poultry seasoning","cajun seasoning","creole seasoning","old bay","taco seasoning","curry powder","red pepper flakes","cinnamon","nutmeg","mace","allspice","ground allspice","clove","cloves","ground clove","cardamom","gochugaru","ginger","ginger powder","ground ginger","turmeric","coriander","coriander seed","celery seed","celery salt","mustard seed","mustard seeds","mustard powder","dry mustard","ground mustard","fennel seed","fennel seeds","caraway","caraway seed","dill seed","dill weed","dill","marjoram","rosemary","sage","tarragon","savory","fenugreek","sumac","star anise","honey","maple syrup","molasses","brown sugar","dried herb","dried herbs","dried spice","dried spices","garlic"]
 };
 
 /* ============================ ROUTER ============================ */
@@ -497,8 +497,14 @@ function toCups(amt,unit,name){
   }
 }
 
-/* ---- paste-and-parse a recipe's ingredient list (offline, no fetch) ---- */
-function parseRecipeText(text){
+/* ---- paste-and-parse a recipe's ingredient list (offline, no fetch) ----
+   opts.known = lines came from a real ingredient list (JSON-LD / DOM), so skip
+   the "long line = instruction" filter that arbitrary pasted text needs. Either
+   way, keep words inside parentheses (some sites, e.g. Recipe Keeper, put the
+   food itself in parens) and drop only the bracket characters — so nothing
+   leaks a stray "(" / ")" as an ingredient. */
+function parseRecipeText(text,opts){
+  const known=!!(opts&&opts.known);
   const UFRAC={"½":.5,"¼":.25,"¾":.75,"⅓":1/3,"⅔":2/3,"⅛":.125,"⅜":.375,"⅝":.625,"⅞":.875,"⅕":.2,"⅖":.4,"⅙":1/6};
   const UNIT={cup:"cup",cups:"cup",tbsp:"tbsp",tablespoon:"tbsp",tablespoons:"tbsp",tsp:"tsp",teaspoon:"tsp",teaspoons:"tsp",oz:"oz",ounce:"oz",ounces:"oz",lb:"lb",lbs:"lb",pound:"lb",pounds:"lb",clove:"each",cloves:"each",can:"each",cans:"each",each:"each",g:"oz",gram:"oz",grams:"oz"};
   const toNum=t=>{t=(t||"").trim();if(UFRAC[t]!=null)return UFRAC[t];
@@ -510,8 +516,8 @@ function parseRecipeText(text){
     let s=raw.trim();
     if(!s) return;
     if(/[:：]\s*$/.test(s)) return;                       // "For the brine:" header
-    if(s.split(/\s+/).length>14) return;                  // long line = an instruction
-    s=s.replace(/\([^)]*\)/g," ");                        // drop "(14 oz)" notes
+    if(!known && s.split(/\s+/).length>14) return;        // long line = an instruction (pasted text only)
+    s=s.replace(/[()]/g," ");                             // drop bracket chars, keep the words inside
     s=s.replace(/^[•\-\u2022\*\d]+[.)]\s*/,"");            // leading bullets / "1." step numbers
     s=s.replace(/(\d)\s*[-–]\s*(\d)/g,"$1 - $2");          // "2-3" -> "2 - 3"
     s=s.replace(/(\d)([½¼¾⅓⅔⅛⅜⅝⅞⅕⅖⅙])/g,"$1 $2");         // "1½" -> "1 ½"
@@ -785,7 +791,7 @@ async function doImportURL(){
     if(r.name)document.getElementById("rname").value=r.name;
     state.recipeSteps=normInstructions(r.recipeInstructions);
     state.canRecipe=detectCanningRecipe(state.recipeSteps);
-    parseAndLoad(r.recipeIngredient.join("\n"),msg);return;
+    parseAndLoad(r.recipeIngredient.join("\n"),msg,{known:true});return;
   }
   // For strategies 2-4, try to pull the page/recipe name + instructions
   var pn=extractPageName(html);
@@ -794,10 +800,10 @@ async function doImportURL(){
   state.canRecipe=detectCanningRecipe(state.recipeSteps);
   // Strategy 2: microdata + common recipe plugin selectors
   var domLines=extractHtmlIngredients(html);
-  if(domLines.length){parseAndLoad(domLines.join("\n"),msg);return;}
+  if(domLines.length){parseAndLoad(domLines.join("\n"),msg,{known:true});return;}
   // Strategy 3: find Ingredients heading, extract sibling list items
   var section=extractIngredientSection(html);
-  if(section){parseAndLoad(section,msg);return;}
+  if(section){parseAndLoad(section,msg,{known:true});return;}
   // Strategy 4: full page text (last resort)
   var stripped=html.replace(/<[^>]+>/g," ").replace(/[ \t]+/g," ").replace(/ \n/g,"\n").replace(/\n /g,"\n");
   parseAndLoad(stripped,msg);
@@ -828,8 +834,9 @@ function extractJsonLdRecipe(html){
 function extractHtmlIngredients(html){
   try{
     var doc=(new DOMParser()).parseFromString(html,"text/html");
-    // microdata
-    var items=doc.querySelectorAll('[itemprop="recipeIngredient"],[itemprop="ingredients"]');
+    // microdata (recipeIngredient is the schema.org standard; "ingredient"/
+    // "ingredients" are legacy variants used by e.g. Recipe Keeper)
+    var items=doc.querySelectorAll('[itemprop="recipeIngredient"],[itemprop="ingredients"],[itemprop="ingredient"]');
     if(items.length>1)return Array.from(items).map(function(el){return el.textContent.trim();}).filter(Boolean);
     // common recipe plugin selectors
     var sels=[
@@ -959,8 +966,8 @@ function showFallback(msg){
     "<button class='btn block' id='manualbtn'>Add ingredients</button>";
   document.getElementById("manualbtn").addEventListener("click",function(){state.canRecipe=null;state.forceTriage=false;parseAndLoad(document.getElementById("pastebox").value,msg);});
 }
-function parseAndLoad(text,msg){
-  const parsed=parseRecipeText(text);
+function parseAndLoad(text,msg,opts){
+  const parsed=parseRecipeText(text,opts);
   if(!parsed.length){
     msg.className="impmsg info";
     msg.textContent="No ingredients found — try pasting them manually.";
@@ -1452,6 +1459,17 @@ function runSelfTests(){
   eq("classify: kimchi juice → prep/brine", cls("kimchi juice"), "prep");
   eq("classify: salt → seasoning", cls("salt"), "seas");
   eq("classify: unknown → review", cls("quibblefop"), "rev");
+  eq("classify: honey → seasoning", cls("honey"), "seas");
+  eq("classify: soy sauce → fresh", cls("soy sauce"), "frs");
+
+  // --- ingredient parsing (known list: keep words in parens, no stray brackets) ---
+  var pk=parseRecipeText("1 1/2 pounds boneless (skinless chicken breasts, cut into small cubes (about 1/2 inch))",{known:true});
+  eq("parse: RK parenthetical keeps chicken", pk.length===1 && /chicken/.test(pk[0].name) && !/[()]/.test(pk[0].name), true);
+  eq("parse: RK chicken amount 1.5 lb", pk.length===1 && pk[0].amount===1.5 && pk[0].unit==="lb", true);
+  var plong=parseRecipeText("Brown or white rice (green onions, sesame seeds, peanuts, lime wedges to squeeze over)",{known:true});
+  eq("parse: known list keeps long garnish line", plong.length, 1);
+  var pinstr=parseRecipeText("Bring the mixture to a boil and simmer for twenty minutes until the sauce thickens nicely",{});
+  eq("parse: pasted long line skipped as instruction", pinstr.length, 0);
 
   // --- canning-recipe detection ---
   const d=det(["Pack hot jars leaving 1 inch headspace.","Process in a pressure canner: pints 75 minutes, quarts 90 minutes at 11 PSI. Wipe rims."]);
