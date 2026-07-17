@@ -450,6 +450,18 @@ class StagingRouter{
     ings.forEach(ing=>{const c=this.classify(ing.name);
       const e=Object.assign({name:ing.name,cups:toCups(ing.amount,ing.unit,ing.name)},c);
       (b[c.pw]||b.rev).push(e);});
+    // Read the recipe's own instructions: an unrecognized ingredient the recipe
+    // tells you to put IN the jar/pot (not garnish/serve) is treated as a no-count
+    // seasoning. Placement is inferred from wording, so it's flagged as uncertain.
+    const steps=opt.steps||[];
+    b.rev.slice().forEach(e=>{
+      if(placementInJar(e.name,steps)){
+        b.rev.splice(b.rev.indexOf(e),1);
+        e.pw="seas";e.cat="seasoning_auto";e.auto=true;
+        e.reason="Auto-detected from the recipe steps as a jar seasoning — placement uncertain; confirm it is only a flavoring, not a low-acid food.";
+        b.seas.push(e);
+      }
+    });
     const res=this.jarProcess(b.inj,opt.jarSize,opt.ft||0,opt.gauge||"dial");
     const jarCups=b.inj.reduce((s,i)=>s+i.cups,0);
     const outCups=[...b.frz,...b.frs,...b.rev].reduce((s,i)=>s+i.cups,0);
@@ -509,6 +521,29 @@ function parseRecipeText(text){
   return out.slice(0,50);
 }
 
+/* ---- does the recipe's own method put this ingredient into the jar/pot? ----
+   Returns true only when a step that mentions the ingredient is a cooking /
+   packing step (jar, pot, pan, stir in, season, simmer...) and is NOT a
+   garnish / serving step. Used to rescue an unknown item from "Review" and
+   treat it as a no-count jar seasoning. */
+const SERVE_STEP=/\b(garnish|garnished|serve|serves|served|serving|top with|topped with|sprinkle over|sprinkle on|finish with|to finish|for serving|to serve|plate|plated|on top|before serving|alongside|drizzle over)\b/;
+const JAR_STEP=/\b(jar|jars|pot|pan|saucepan|dutch oven|skillet|pack|packed|add|added|stir|stirred|combine|combined|mix|mixed|season|seasoned|sprinkle in|simmer|simmered|boil|boiled|cook|cooked|marinate|marinated|rub|rubbed|dredge|dredged|toss|tossed|braise|braised|into the|to the)\b/;
+function placementInJar(name,steps){
+  if(!steps||!steps.length) return false;
+  const n=(name||"").toLowerCase().trim();
+  if(!n) return false;
+  const toks=n.split(/[^a-z]+/).filter(w=>w.length>=4);
+  for(const raw of steps){
+    if(!raw) continue;
+    const low=" "+String(raw).toLowerCase()+" ";
+    const hit=low.indexOf(n)>=0||toks.some(t=>low.indexOf(t)>=0);
+    if(!hit) continue;
+    if(SERVE_STEP.test(low)) return false;   // explicit serving/garnish step wins
+    if(JAR_STEP.test(low)) return true;
+  }
+  return false;
+}
+
 /* ============================ APP STATE ============================ */
 const router=new StagingRouter(DATA);
 const state={
@@ -516,19 +551,7 @@ const state={
   altFt:0,             // user's elevation — drives the PSI adjustment
   gauge:"dial",        // "dial" | "weighted"
   recipeSteps:[],
-  ings:[
-    {name:"boneless chicken thighs",amount:2,unit:"lb"},
-    {name:"kimchi juice",amount:0.5,unit:"cup"},
-    {name:"buttermilk",amount:1,unit:"cup"},
-    {name:"egg",amount:1,unit:"each"},
-    {name:"all-purpose flour",amount:1,unit:"cup"},
-    {name:"mayonnaise",amount:0.25,unit:"cup"},
-    {name:"cabbage",amount:1,unit:"cup"},
-    {name:"vegetable oil",amount:0.25,unit:"cup"},
-    {name:"gochugaru",amount:1,unit:"tsp"},
-    {name:"salt",amount:1,unit:"tsp"},
-    {name:"brioche bun",amount:1,unit:"each"}
-  ]
+  ings:[]
 };
 const UNITS=["cup","tbsp","tsp","oz","lb","each"];
 const PILL={inj:["inj","IN-JAR"],frz:["frz","FREEZE"],frs:["frs","FRESH"],prep:["prep","PREP"],rev:["rev","REVIEW"],seas:["seas","SEASONING"]};
@@ -1031,7 +1054,7 @@ function assemblyCard(res,size){
 }
 
 function resultsFor(size){
-  const res=router.stage(state.ings,{jarSize:size,ft:state.altFt,gauge:state.gauge});
+  const res=router.stage(state.ings,{jarSize:size,ft:state.altFt,gauge:state.gauge,steps:state.recipeSteps});
   const revItems=res.b.rev;
   // banner
   let banner="";
@@ -1054,7 +1077,9 @@ function resultsFor(size){
   const order=["inj","prep","frz","frs","rev","seas"];
   let rows="";
   order.forEach(pw=>res.b[pw].forEach(it=>{
-    rows+='<div class="brk-row"><span class="nm">'+esc(it.name)+'</span><span class="pill '+PILL[pw][0]+'">'+PILL[pw][1]+'</span></div>';
+    const nm=esc(it.name)+(it.auto?' <span style="font-size:11px;color:var(--muted);font-style:italic">— placement from recipe steps; confirm it\'s only a flavoring</span>':"");
+    const pill=it.auto?"SEASONING?":PILL[pw][1];
+    rows+='<div class="brk-row"><span class="nm">'+nm+'</span><span class="pill '+PILL[pw][0]+'">'+pill+'</span></div>';
   }));
   return '<div class="card">'+banner+
       '<h2 style="margin-bottom:6px">'+esc(document.getElementById("rname").value)+'</h2>'+
@@ -1074,7 +1099,7 @@ function renderResults(){
 
 /* ============================ RENDER: prepare ============================ */
 function prepareFor(size){
-  const res=router.stage(state.ings,{jarSize:size,ft:state.altFt,gauge:state.gauge});
+  const res=router.stage(state.ings,{jarSize:size,ft:state.altFt,gauge:state.gauge,steps:state.recipeSteps});
   const head='<div class="card" style="padding-bottom:15px"><h2 style="margin-bottom:4px">'+esc(document.getElementById("rname").value)+'</h2>'+
     '<div style="font-size:12px;color:var(--muted)">'+(size==="pt"?"5-pint load":"4-quart load")+' · preparation &amp; process</div></div>';
   const tail='<div class="card"><p class="disc" style="margin:0;border:none;padding:0">Triage aid only — confirm the exact time, pressure, and jar size against the USDA Complete Guide or nchfp.uga.edu before canning.</p></div>';
