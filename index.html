@@ -871,10 +871,29 @@ function extractIngredientSection(html){
 function extractPageName(html){
   try{
     var doc=(new DOMParser()).parseFromString(html,"text/html");
-    var h1=doc.querySelector("h1");
-    if(h1){var t=h1.textContent.trim();if(t&&t.length<100)return t;}
-    var title=doc.title||"";
-    return title.replace(/\s*[\|\-–—].*$/,"").trim();
+    var pick=function(sel,attr){var el=doc.querySelector(sel);if(!el)return "";var v=(attr?el.getAttribute(attr):el.textContent)||"";return v.trim();};
+    // Prefer share-preview / recipe-specific titles. og:title is the clean recipe
+    // name on sites like Recipe Keeper, whose <title> is "Recipe Keeper - <name>".
+    var cands=[
+      pick('meta[property="og:title"]','content'),
+      pick('meta[name="twitter:title"]','content'),
+      pick('meta[property="twitter:title"]','content'),
+      pick('[itemprop="name"]'),
+      pick('.recipe-name'), pick('.recipe-title'), pick('.wprm-recipe-name'),
+      pick('h1')
+    ].filter(Boolean);
+    // <title> as last resort: split on separators and drop brand-looking parts,
+    // so it works whether the brand is a prefix or a suffix.
+    var title=(doc.title||"").trim();
+    if(title){
+      var BRAND=/^(recipe ?keeper|allrecipes|food ?52|pinterest|facebook|instagram|home|recipes?|paprika|recipesage|copy ?me ?that)$/i;
+      // split on strong separators (|·»/en/em dash) or a SPACED hyphen only —
+      // never a bare hyphen, so "Smoke-Grilled" stays intact.
+      var parts=title.split(/\s*[|–—·»]\s*|\s+-\s+/).map(function(s){return s.trim();}).filter(Boolean);
+      var nonBrand=parts.filter(function(p){return !BRAND.test(p);});
+      cands.push(nonBrand.length?nonBrand.sort(function(a,b){return b.length-a.length;})[0]:title);
+    }
+    for(var i=0;i<cands.length;i++){if(cands[i]&&cands[i].length<120)return cands[i];}
   }catch(e){}
   return "";
 }
