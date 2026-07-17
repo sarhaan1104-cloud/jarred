@@ -568,20 +568,29 @@ function detectCanningRecipe(steps){
   };
   const count=Object.keys(signals).filter(k=>signals[k]).length;
   if(count<2) return null;
-  // extract the author's stated process
-  const findTime=word=>{
-    let m=new RegExp(word+"[a-z]*\\b[^.;]{0,30}?(\\d+)\\s*(?:min|minute)","i").exec(text)
-        ||new RegExp("(\\d+)\\s*(?:min|minute)[^.;]{0,30}?"+word,"i").exec(text);
+  // extract the author's stated process. Normalize jar-size synonyms to neutral
+  // tokens first so US (pint/quart) and metric (half-litre/litre) both map. Order
+  // matters: collapse "half-litre" BEFORE "litre" so a half-litre isn't read as a litre.
+  let t=" "+text+" ";
+  t=t.replace(/half[\s-]?(?:litre|liter|pint)s?/g," pintjar ")
+     .replace(/\b(?:litre|liter)s?\b/g," quartjar ")
+     .replace(/\bquarts?\b/g," quartjar ")
+     .replace(/\bpints?\b/g," pintjar ");
+  const findTime=tok=>{
+    let m=new RegExp(tok+"[^.;]{0,40}?(\\d+)\\s*(?:min|minute)").exec(t)
+        ||new RegExp("(\\d+)\\s*(?:min|minute)[^.;]{0,40}?"+tok).exec(t);
     return m?+m[1]:null;
   };
-  let timePt=findTime("pint"), timeQt=findTime("quart");
-  // fallback: a single unqualified process time applies to whatever size is mentioned
+  let timePt=findTime("pintjar"), timeQt=findTime("quartjar");
+  // Fallback ONLY when the recipe gives a single time: if there are two or more
+  // DIFFERENT minute values (e.g. 75 vs 90) we must not guess which size each is.
   if(timePt==null&&timeQt==null){
-    const m=/process[^.;]{0,40}?(\d+)\s*(?:min|minute)/i.exec(text);
-    if(m){timePt=+m[1];timeQt=+m[1];}
+    const mins=(t.match(/(\d+)\s*(?:min|minute)/g)||[]).map(s=>parseInt(s,10));
+    const uniq=Array.from(new Set(mins));
+    if(uniq.length===1){timePt=uniq[0];timeQt=uniq[0];}
   }
-  let psi=null;const pm=/(\d+)\s*(?:psi|pounds?)/i.exec(text);if(pm)psi=+pm[1];
-  let hs=null;const hm=/(\d+(?:\.\d+)?|½|¼|¾|⅓|⅔|\d\/\d)\s*-?\s*(?:inch|in\b|")\s*(?:of\s*)?head/i.exec(text);
+  let psi=null;const pm=/(\d+)\s*(?:psi|pounds?|lbs?)\b/.exec(t);if(pm)psi=+pm[1];
+  let hs=null;const hm=/(\d+(?:\.\d+)?|½|¼|¾|⅓|⅔|\d\/\d)\s*-?\s*(?:inch|inches|in\b|")\)?\s*(?:of\s*)?head/.exec(t);
   if(hm)hs=_numFrac(hm[1]);
   return {isCanning:true,count,signals,timePt,timeQt,psi,hs};
 }
