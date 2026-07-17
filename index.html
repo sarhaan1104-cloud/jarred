@@ -397,7 +397,7 @@ const DATA = {
     puree:{route:"rev", reason:"Pureed/mashed low-acid foods have NO tested process — heat can't be guaranteed to reach the center.",
       items:["puree","pureed","mashed","refried","mashed potato","mashed squash","meat paste"]}
   },
-  seasonings:["salt","pepper","black pepper","white pepper","sugar","cumin","paprika","smoked paprika","chili powder","garlic powder","onion powder","oregano","basil","thyme","bay leaf","herbes de provence","italian seasoning","red pepper flakes","cinnamon","gochugaru","ginger","turmeric","coriander","dried herb","dried spice","garlic","ginger powder"]
+  seasonings:["salt","pepper","black pepper","white pepper","sugar","cumin","cumin seed","paprika","smoked paprika","chili powder","chile powder","cayenne","cayenne pepper","chipotle powder","ancho powder","garlic powder","onion powder","garlic salt","onion salt","seasoned salt","seasoning salt","oregano","basil","thyme","bay leaf","bay leaves","herbes de provence","italian seasoning","poultry seasoning","cajun seasoning","creole seasoning","old bay","taco seasoning","curry powder","red pepper flakes","cinnamon","nutmeg","mace","allspice","ground allspice","clove","cloves","ground clove","cardamom","gochugaru","ginger","ginger powder","ground ginger","turmeric","coriander","coriander seed","celery seed","celery salt","mustard seed","mustard seeds","mustard powder","dry mustard","ground mustard","fennel seed","fennel seeds","caraway","caraway seed","dill seed","dill weed","dill","marjoram","rosemary","sage","tarragon","savory","fenugreek","sumac","star anise","dried herb","dried herbs","dried spice","dried spices","garlic"]
 };
 
 /* ============================ ROUTER ============================ */
@@ -1147,6 +1147,28 @@ function assemblyCard(res,size){
     '<div class="plan-lab" style="margin-top:16px">Rebuild the meal</div>'+
     '<ol class="plan-steps">'+rebuild.map(s=>'<li>'+s+'</li>').join("")+'</ol></div>';
 }
+/* ---- how much of the dish's flavor rides into the jar vs. added fresh ---- */
+function flavorCard(res){
+  if(!res.jp) return "";
+  const core=res.b.inj.filter(i=>!(i.proc&&i.proc.liquid));
+  if(!core.length) return "";
+  const seas=res.b.seas||[], prep=res.b.prep||[], fresh=res.b.frs||[], frz=res.b.frz||[];
+  // nothing to split (e.g. author mode packs everything) → skip
+  if(!seas.length&&!prep.length&&!fresh.length&&!frz.length) return "";
+  const nm=a=>a.map(i=>esc(i.name)).join(", ");
+  const dim=s=>' <span style="color:var(--muted)">'+s+'</span>';
+  const inJar=['<li><b>'+nm(core)+'</b>'+dim('— the core, packed and processed')+'</li>'];
+  if(seas.length) inJar.push('<li>'+nm(seas)+dim('— dry seasoning, safe in the jar; the canned food keeps this flavor')+'</li>');
+  if(prep.length) inJar.push('<li>'+nm(prep)+dim('— flavors the food in a pre-soak, then drained; the taste stays in the meat')+'</li>');
+  const later=[];
+  fresh.forEach(i=>later.push('<li>'+esc(i.name)+'</li>'));
+  frz.forEach(i=>later.push('<li>'+esc(i.name)+dim('— from the freezer')+'</li>'));
+  return '<div class="card"><h2>Flavor: canned in vs. added fresh</h2>'+
+    '<p class="hint">How much of the dish’s flavor rides into the jar with the food, and what you add when you serve.</p>'+
+    '<div class="plan-lab">Flavor canned with the food</div><ol class="plan-steps">'+inJar.join("")+'</ol>'+
+    (later.length?'<div class="plan-lab" style="margin-top:14px">Added fresh at serving</div><ol class="plan-steps">'+later.join("")+'</ol>':'')+
+    '</div>';
+}
 
 function resultsFor(size){
   const res=stageFor(size);
@@ -1196,7 +1218,8 @@ function resultsFor(size){
         '<div><p class="verdict-t">'+esc(vt)+'</p><p class="verdict-s">Goal: ≤15% outside-jar, weighted by volume. Seasonings and brine (PREP) are excluded from this math.</p></div></div>'+
       chipsH+'</div>'+
     '<div class="card"><h2>Ingredient breakdown</h2>'+rows+
-      '<p class="disc">Percentages are a volume estimate (units converted to cups) for planning, not a precise measure. This is a triage aid — it does not certify the recipe as safe. Confirm the exact process against the USDA Complete Guide or nchfp.uga.edu before canning.</p></div>';
+      '<p class="disc">Percentages are a volume estimate (units converted to cups) for planning, not a precise measure. This is a triage aid — it does not certify the recipe as safe. Confirm the exact process against the USDA Complete Guide or nchfp.uga.edu before canning.</p></div>'+
+    flavorCard(res);
 }
 function renderResults(){
   const t=document.getElementById("tab-results");
